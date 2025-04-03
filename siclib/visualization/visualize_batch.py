@@ -184,7 +184,7 @@ def make_perspective_figures(
     n_pairs = min(n_pairs, len(data["image"]))
     figures = make_up_figure(pred, data, n_pairs)
     figures |= make_latitude_figure(pred, data, n_pairs)
-    figures |= make_camera_figure(pred, data, n_pairs)
+    # figures |= make_camera_figure(pred, data, n_pairs)
 
     {f.tight_layout() for f in figures.values()}
 
