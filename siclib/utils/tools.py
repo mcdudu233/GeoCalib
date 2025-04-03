@@ -303,7 +303,8 @@ def fork_rng(seed=None, with_cuda=True):
 def get_device() -> str:
     device = "cpu"
     if torch.cuda.is_available():
-        device = "cuda"
+        # 使用最后一个可用的GPU
+        device = "cuda:" + str(torch.cuda.device_count() - 1)
     elif torch.backends.mps.is_available():
         device = "mps"
     return device
