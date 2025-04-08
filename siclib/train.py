@@ -52,6 +52,7 @@ from siclib.utils.tools import (
 # TODO: add plotting during evaluation
 
 default_train_conf = {
+    "device": "0",  # 指定训练设备号
     "seed": "???",  # training seed
     "epochs": 1,  # number of epochs
     "num_steps": None,  # number of steps, overwrites epochs
@@ -288,7 +289,7 @@ def training(rank, conf, output_dir, args):
         if "num_workers" in data_conf:
             data_conf.num_workers = int((data_conf.num_workers + args.n_gpus - 1) / args.n_gpus)
     else:
-        device = get_device()
+        device = get_device(conf.device)
     logger.info(f"Using device {device}")
 
     dataset = get_dataset(data_conf.name)(data_conf)

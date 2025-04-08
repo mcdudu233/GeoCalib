@@ -300,11 +300,11 @@ def fork_rng(seed=None, with_cuda=True):
         set_random_state(state)
 
 
-def get_device() -> str:
-    device = "cpu"
+def get_device(num=0) -> str:
+    # num 是指定的设备号
+    device = "cpu:" + str(num)
     if torch.cuda.is_available():
-        # 使用最后一个可用的GPU
-        device = "cuda:" + str(torch.cuda.device_count() - 1)
+        device = "cuda:" + str(num)
     elif torch.backends.mps.is_available():
-        device = "mps"
+        device = "mps:" + str(num)
     return device
