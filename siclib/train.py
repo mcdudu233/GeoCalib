@@ -475,7 +475,7 @@ def training(rank, conf, output_dir, args):
             with autocast(enabled=args.mixed_precision is not None, dtype=mp_dtype):
                 data = batch_to_device(data, device, non_blocking=False)
                 pred = model(data)
-                losses, metrics = loss_fn(pred, data)
+                losses, metrics = loss_fn(pred, data, epoch, conf.train.epochs)
                 loss = torch.mean(losses["total"])
 
             # Skip the iteration if any rank encountered a NaN

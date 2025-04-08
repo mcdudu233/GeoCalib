@@ -1,4 +1,7 @@
 import logging
+import math
+
+import numpy as np
 
 from siclib.models import get_model
 from siclib.models.base_model import BaseModel
@@ -52,9 +55,13 @@ class GeoCalib(BaseModel):
 
         return out
 
-    def loss(self, pred, data):
+    def loss(self, pred, data, epoch=0, epochs=1):
+        # 动态权重 余弦退火
+        # b的范围从0到1
+        b = 0.5 * ( 1 + np.cos(np.pi * (epoch / epochs)))
+
         losses, metrics = self.perspective_decoder.loss(pred, data)
-        total = losses["perspective_total"]
+        total = b * losses["perspective_total"]
 
         if self.optimizer is not None:
             opt_losses, param_metrics = self.optimizer.loss(pred, data)
