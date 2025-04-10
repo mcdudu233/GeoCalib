@@ -1,0 +1,31 @@
+name: networks.geocalib_vil
+
+ll_enc:
+  name: encoders.low_level_encoder
+
+backbone:
+  name: encoders.vil
+  weights: weights/vil2_base16_e400_in1k.th
+
+perspective_decoder:
+  name: decoders.perspective_decoder_vil
+
+  up_decoder:
+    name: decoders.up_decoder_vil
+    loss_type: l1
+    use_uncertainty_loss: true
+    decoder:
+      name: decoders.light_hamburger_vil
+      predict_uncertainty: true
+
+  latitude_decoder:
+    name: decoders.latitude_decoder_vil
+    loss_type: l1
+    use_uncertainty_loss: true
+    decoder:
+      name: decoders.light_hamburger_vil
+      predict_uncertainty: true
+
+optimizer:
+  name: optimization.lm_optimizer
+  camera_model: pinhole

@@ -12,3 +12,5 @@ pandas
 tqdm
 tensorboard
 wandb
+
+einops

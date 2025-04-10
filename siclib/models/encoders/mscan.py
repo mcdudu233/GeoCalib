@@ -233,6 +233,7 @@ class MSCAN(BaseModel):
             setattr(self, f"norm{i + 1}", norm)
 
     def _forward(self, data):
+        # img格式：[batch,channel,height,width]
         img = data["image"]
         # rgb -> bgr and from [0, 1] to [0, 255]
         x = img[:, [2, 1, 0], :, :] * 255.0

@@ -748,4 +748,4 @@ if __name__ == "__main__":
             args.lock_file.unlink()
         torch.multiprocessing.spawn(main_worker, nprocs=args.n_gpus, args=(conf, output_dir, args))
     else:
-        main_worker(0, conf, output_dir, args)
+        main_worker(1, conf, output_dir, args)
