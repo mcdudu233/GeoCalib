@@ -199,6 +199,12 @@ class LightHamHead(BaseModel):
 
         self.with_ll = conf.with_low_level
         if self.with_ll:
+            self.out_transpose_conv = nn.ConvTranspose2d(
+                in_channels=self.out_channels,
+                out_channels=self.out_channels,
+                kernel_size=4,
+                stride=4
+            )
             self.out_conv = ConvModule(
                 self.out_channels, self.out_channels, 3, padding=1, bias=False
             )
@@ -209,8 +215,6 @@ class LightHamHead(BaseModel):
         # inputs = self._transform_inputs(inputs)
         inputs = features["hl"]
 
-        inputs = F.interpolate(inputs, scale_factor=4, mode="bilinear", align_corners=False)
-
         x = self.squeeze(inputs)
 
         x = self.hamburger(x)
@@ -219,6 +223,7 @@ class LightHamHead(BaseModel):
 
         if self.with_ll:
             assert "ll" in features, "Low-level features are required for this model"
+            feats = self.out_transpose_conv(feats)
             feats = F.interpolate(feats, scale_factor=2, mode="bilinear", align_corners=False)
             feats = self.out_conv(feats)
             feats = F.interpolate(feats, scale_factor=2, mode="bilinear", align_corners=False)
