@@ -857,7 +857,7 @@ class ViLBlockPair(nn.Module):
 
 class ViL(BaseModel):
     default_conf = {
-        "dim": 768,
+        "dim": 384,
         "depth": 12,
         "legacy_norm": True,
         "pooling": "bilateral_flatten",

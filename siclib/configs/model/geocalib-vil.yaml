@@ -5,7 +5,7 @@ ll_enc:
 
 backbone:
   name: encoders.vil
-  weights: weights/vil2_base16_e400_in1k.th
+  weights: weights/vil2_small16_e400_in1k.th
 
 perspective_decoder:
   name: decoders.perspective_decoder_vil
