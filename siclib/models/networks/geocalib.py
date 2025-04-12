@@ -58,7 +58,7 @@ class GeoCalib(BaseModel):
     def loss(self, pred, data, epoch=0, epochs=1):
         # 动态权重 余弦退火
         # b的范围从0到1
-        b = 0.5 * ( 1 + np.cos(np.pi * (epoch / epochs)))
+        b = 1.0 * ( 1 + np.cos(np.pi * (epoch / epochs)))
 
         losses, metrics = self.perspective_decoder.loss(pred, data)
         total = b * losses["perspective_total"]
