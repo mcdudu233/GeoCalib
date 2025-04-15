@@ -644,8 +644,6 @@ class SegMANDecoder(BaseModel):
         else:
             feat = torch.cat([_c3, _c4], dim=1)
 
-        print(feat.shape)
-
         _, _c2, _c3 = self.freqfusion_c3(hr_feat=_c2, lr_feat=feat)
         print(_c2.shape)
         print(_c3.shape)
@@ -654,7 +652,7 @@ class SegMANDecoder(BaseModel):
             feat = torch.cat([_c3.reshape(b * self.feature_resample_group, -1, h, w),
                                      _c4.reshape(b * self.feature_resample_group, -1, h, w)], dim=1).reshape(b, -1, h, w)
         else:
-            feat = torch.cat([_c2, feat], dim=1)
+            feat = torch.cat([_c2, _c3], dim=1)
 
         print(feat.shape)
         print((torch.cat([_c4, _c3, _c2], dim=1)).shape)
