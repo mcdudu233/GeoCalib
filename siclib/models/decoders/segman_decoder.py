@@ -545,7 +545,7 @@ class SegMANDecoder(BaseModel):
         self.align_corners = False
         self.with_ll = conf.with_low_level
 
-        self.conv_seg = nn.Conv2d(self.embed_dim, self.num_classes, kernel_size=1)
+        self.conv_seg = nn.Conv2d(self.embed_dim, self.out_channels, kernel_size=1)
         self.dropout_ratio = conf.dropout_ratio
         if self.dropout_ratio > 0:
             self.dropout = nn.Dropout2d(self.dropout_ratio)
@@ -701,7 +701,9 @@ class SegMANDecoder(BaseModel):
 
         if self.with_ll:
             assert "ll" in features, "Low-level features are required for this model"
+            print(feats.shape)
             feats = F.interpolate(feats, scale_factor=2, mode="bilinear", align_corners=False)
+            print(feats.shape)
             feats = self.out_conv(feats)
             feats = F.interpolate(feats, scale_factor=2, mode="bilinear", align_corners=False)
             feats_ll = features["ll"].clone()
