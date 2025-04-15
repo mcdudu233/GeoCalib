@@ -569,7 +569,7 @@ class SegMANDecoder(BaseModel):
         self.linear_c3 = MLP(self.in_channels[2], self.feat_proj_dim)
         self.linear_c2 = MLP(self.in_channels[1], self.feat_proj_dim)
 
-        # self.feature_resample = conf.feature_resample
+        self.feature_resample = conf.feature_resample
         # self.freqfusion_c3 = FreqFusion(
         #     hr_channels=c, lr_channels=pre_c,
         #     feature_resample=self.feature_resample, feature_resample_group=conf.feature_resample_group,
