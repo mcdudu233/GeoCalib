@@ -635,19 +635,27 @@ class SegMANDecoder(BaseModel):
         _c3 = self.linear_c3(c3)
         _c2 = self.linear_c2(c2)
 
-        print(_c4.shape)
-        _, hires_feat, lowres_feat = self.freqfusion_c4(hr_feat=_c3, lr_feat=_c4)
-        print(hires_feat.shape)
-        print(lowres_feat.shape)
+        _, _c3, _c4 = self.freqfusion_c4(hr_feat=_c3, lr_feat=_c4)
         if self.feature_resample:
-            b, _, h, w = hires_feat.shape
-            lowres_feat = torch.cat([hires_feat.reshape(b * self.feature_resample_group, -1, h, w),
-                                     lowres_feat.reshape(b * self.feature_resample_group, -1, h, w)], dim=1).reshape(b, -1, h, w)
+            b, _, h, w = _c3.shape
+            feat = torch.cat([_c3.reshape(b * self.feature_resample_group, -1, h, w),
+                                     _c4.reshape(b * self.feature_resample_group, -1, h, w)], dim=1).reshape(b, -1, h, w)
         else:
-            lowres_feat = torch.cat([hires_feat, lowres_feat], dim=1)
+            feat = torch.cat([_c3, _c4], dim=1)
 
-        _c4 = resize(_c4, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
-        _c3 = resize(_c3, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
+        print(feat.shape)
+
+        _, _c2, _c3 = self.freqfusion_c4(hr_feat=_c3, lr_feat=feat)
+        print(_c2.shape)
+        print(_c3.shape)
+        if self.feature_resample:
+            b, _, h, w = _c3.shape
+            feat = torch.cat([_c3.reshape(b * self.feature_resample_group, -1, h, w),
+                                     _c4.reshape(b * self.feature_resample_group, -1, h, w)], dim=1).reshape(b, -1, h, w)
+        else:
+            feat = torch.cat([_c2, feat], dim=1)
+
+        print(feat.shape)
 
         _c = self.linear_fuse(torch.cat([_c4, _c3, _c2], dim=1))
 
