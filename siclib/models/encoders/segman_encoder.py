@@ -990,9 +990,11 @@ class SegMANEncoder(BaseModel):
 
     def flexible_load(self, state_dict):
         for key in state_dict.keys():
-            print(key + state_dict[key].shape)
+            print(key + ": ", end="")
+            print(state_dict[key].shape)
 
         for key in self.state_dict().keys():
-            print(key + self.state_dict()[key].shape)
+            print(key + ": ", end="")
+            print(self.state_dict()[key].shape)
 
         # super().flexible_load(state_dict)
