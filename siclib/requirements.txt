@@ -17,3 +17,5 @@ einops
 timm
 fvcore
 mmcv-full
+
+natten

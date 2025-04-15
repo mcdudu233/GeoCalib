@@ -1,6 +1,4 @@
 import math
-import time
-import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -10,8 +8,6 @@ from mmcv.runner import load_state_dict
 from natten.functional import na2d, na2d_av, na2d_qk
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from timm.models.layers import DropPath, to_2tuple
-from fvcore.nn import flop_count, parameter_count
-from natten.flops import qk_2d_rpb_flop, av_2d_flop, add_natten_handle
 
 from siclib.models import BaseModel
 from siclib.models.utils.csm_triton import CrossScanTriton, CrossMergeTriton
@@ -1063,36 +1059,3 @@ class SegMANEncoder(BaseModel):
     def loss(self, pred, data):
         """Compute the loss."""
         raise NotImplementedError
-
-    def flops(self, shape=(3, 224, 224)):
-
-        supported_ops = {
-            "prim::PythonOp.SelectiveScanMamba": selective_scan_flop_jit,
-            "prim::PythonOp.SelectiveScanOflex": selective_scan_flop_jit,
-            "prim::PythonOp.SelectiveScanCore": selective_scan_flop_jit,
-            "prim::PythonOp.SelectiveScanNRow": selective_scan_flop_jit,
-            "prim::PythonOp.NeighborhoodAttention2DQKAutogradFunction": qk_2d_rpb_flop,
-            "prim::PythonOp.NeighborhoodAttention2DAVAutogradFunction": av_2d_flop,
-            # "prim::PythonOp.FusedNeighborhoodAttention2D": fna_generic_flops,
-        }
-
-        model = copy.deepcopy(self)
-
-        if torch.cuda.is_available:
-            model.cuda()
-        model.eval()
-
-        input = torch.randn((1, *shape), device=next(model.parameters()).device)
-        params = parameter_count(model)[""]
-        Gflops, unsupported = flop_count(model=model, inputs=(input,), supported_ops=supported_ops)
-
-        batch_size = 64
-        input = torch.randn((batch_size, *shape), device=next(model.parameters()).device)
-        # latency
-        start_time = time.time()
-        for _ in range(64):
-            _ = model(input)
-        FPS = batch_size * 64 / (time.time() - start_time)
-
-        del model, input
-        return (sum(Gflops.values()), params, FPS)

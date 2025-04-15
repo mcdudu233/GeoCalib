@@ -1,5 +1,20 @@
+conda create -n geocalib-man python=3.11
+
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+pip3 install torch torchvision torchaudio -f https://mirrors.aliyun.com/pytorch-wheels/cu124
+
 pip install -r requirements.txt
 
-pip install natten==0.17.3+torch210cu121 -f https://shi-labs.com/natten/wheels/
+
+
+cd siclib
+
+pip install -U openmim
+mim install mmcv-full
+
+pip install natten==0.17.5
+pip3 install natten==0.17.5+torch260cu124 -f https://shi-labs.com/natten/wheels/
 
 cd kernels/selective_scan && pip install .
+
+pip install -r requirements.txt
