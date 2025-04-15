@@ -865,22 +865,9 @@ def stem(in_chans=3, embed_dim=96):
     )
 
 
-def _cfg(url=None, **kwargs):
-    return {
-        'url': url,
-        'input_size': (3, 224, 224),
-        'crop_pct': 0.9,
-        'interpolation': 'bicubic',  # 'bilinear' or 'bicubic'
-        'mean': IMAGENET_DEFAULT_MEAN,
-        'std': IMAGENET_DEFAULT_STD,
-        'classifier': 'classifier',
-        **kwargs,
-    }
-
-
 class SegMANEncoder(BaseModel):
     default_conf = {
-        "image_size": 512,
+        "image_size": 320,
         "in_channels": 3,
     }
 
@@ -956,10 +943,15 @@ class SegMANEncoder(BaseModel):
 
         self.apply(self._init_weights)
 
+        checkpoint = torch.load("weights/SegMAN_Encoder_s.pth.tar", map_location='cpu')
+        state_dict_name = 'state_dict_ema'
+        state_dict = checkpoint[state_dict_name]
+        self.load_state_dict(state_dict, strict=False)
+        print(f"loaded state dict using {state_dict_name} from {self.pretrained}")
+
         if torch.distributed.is_initialized():
             self = nn.SyncBatchNorm.convert_sync_batchnorm(self)
 
-        self.default_cfg = _cfg()
 
     def _init_weights(self, m):
         if isinstance(m, nn.Conv2d):
