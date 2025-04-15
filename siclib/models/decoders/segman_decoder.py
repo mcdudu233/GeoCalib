@@ -711,6 +711,9 @@ class SegMANDecoder(BaseModel):
             self.linear_pred_uncertainty(feats).squeeze(1) if self.predict_uncertainty else None
         )
 
+        print(feats.shape)
+        print(uncertainty.shape)
+
         return feats, uncertainty
 
 
