@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 from einops import einsum, rearrange, repeat
-from mmcv.runner import load_state_dict
 from natten.functional import na2d, na2d_av, na2d_qk
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from timm.models.layers import DropPath, to_2tuple
@@ -12,9 +11,6 @@ from timm.models.layers import DropPath, to_2tuple
 from siclib.models import BaseModel
 from siclib.models.utils.csm_triton import CrossScanTriton, CrossMergeTriton
 import selective_scan_cuda_oflex
-
-import logging
-logger = logging.getLogger(__name__)
 
 
 def get_continuous_paths(N):
@@ -168,15 +164,6 @@ def print_jit_input_names(inputs):
     print("", flush=True)
 
 
-def selective_scan_flop_jit(inputs, outputs):
-    print_jit_input_names(inputs)
-    B, D, L = inputs[0].type().sizes()
-    N = inputs[2].type().sizes()[1]
-    flops = flops_selective_scan_fn(B=B, L=L, D=D, N=N, with_D=True, with_Z=False)
-
-    return flops
-
-
 class SelectiveScanOflex(torch.autograd.Function):
     @staticmethod
     @torch.cuda.amp.custom_fwd
@@ -262,16 +249,6 @@ class LayerScale(nn.Module):
 
     def extra_repr(self) -> str:
         return '{dim}, init_value={init_value}, bias={enable_bias}'.format(**self.__dict__)
-
-
-class GroupNorm(nn.GroupNorm):
-    """
-    Group Normalization with 1 group.
-    Input: tensor in shape [B, C, H, W]
-    """
-
-    def __init__(self, num_channels):
-        super().__init__(num_groups=1, num_channels=num_channels, eps=1e-6)
 
 
 class LayerNorm2d(nn.LayerNorm):
@@ -929,15 +906,11 @@ class SegMANEncoder(BaseModel):
         ssm_split = False
         fused_na = False
         ssm_ratio = 1.0
-        pretrained = None
-        _layer = BasicLayer
 
         self.num_layers = len(depths)
         self.embed_dim = embed_dims[0]
         self.num_features = embed_dims[-1]
         self.mlp_ratios = mlp_ratios
-
-        self.pretrained = pretrained
 
         # split image into non-overlapping patches
         self.patch_embed = stem(in_chans=in_chans, embed_dim=embed_dims[0])
@@ -952,7 +925,7 @@ class SegMANEncoder(BaseModel):
         # build layers
         self.layers = nn.ModuleList()
         for i_layer in range(self.num_layers):
-            layer = _layer(
+            layer = BasicLayer(
                 embed_dim=embed_dims[i_layer],
                 depth=depths[i_layer],
                 num_heads=num_heads[i_layer],
@@ -1007,54 +980,22 @@ class SegMANEncoder(BaseModel):
             nn.init.ones_(m.weight)
             nn.init.zeros_(m.bias)
 
-    def init_weights(self, pretrained=None):
-        if isinstance(self.pretrained, str):
-            checkpoint = torch.load(self.pretrained, map_location='cpu')
-            # if 'ema' in self.pretrained:
-            #     state_dict_name = 'state_dict_ema'
-            # else:
-            #     state_dict_name = 'state_dict'
-            #     # load_checkpoint(self, self.pretrained, map_location='cpu', strict=False, logger=logger)
-            # state_dict = checkpoint[state_dict_name]
-            # self.load_state_dict(state_dict, strict=False)
-            # logger.info(f"loaded state dict using {state_dict_name} from {self.pretrained}")
-            try:
-                state_dict = checkpoint['state_dict_ema']
-                state_dict_name = 'state_dict_ema'
-            except:
-                state_dict = checkpoint['state_dict']
-                state_dict_name = 'state_dict'
-
-            load_state_dict(self, state_dict)
-            logger.info(f"loaded pretrained weights using {state_dict_name} from {self.pretrained}")
-
-    @torch.jit.ignore
-    def no_weight_decay(self):
-        return {'absolute_pos_embed'}
-
-    @torch.jit.ignore
-    def no_weight_decay_keywords(self):
-        return {'relative_position_bias_table'}
-
-    def forward_features(self, x):
-        x = self.patch_embed(x)
-
-        out = []
-
-        for i, layer in enumerate(self.layers):
-            x = layer(x)
-            if i % 2 == 0:
-                out.append(x)
-
-        return out
 
     def _forward(self, data):
         img = data["image"]
         # rgb -> bgr and from [0, 1] to [0, 255]
         x = img[:, [2, 1, 0], :, :] * 255.0
 
-        x = self.forward_features(x)
-        return {"features": x}
+        x = self.patch_embed(x)
+
+        out = []
+        for i, layer in enumerate(self.layers):
+            x = layer(x)
+            if i % 2 == 0:
+                out.append(x)
+
+        return {"features": out}
+
 
     def loss(self, pred, data):
         """Compute the loss."""

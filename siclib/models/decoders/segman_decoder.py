@@ -5,8 +5,6 @@
 # ---------------------------------------------------------------
 from siclib.models import BaseModel
 from siclib.models.utils.functions import resize
-# from .decode_head import BaseDecodeHead
-# from mmseg.models.utils import *
 
 import math
 import torch
@@ -24,259 +22,6 @@ import selective_scan_cuda_oflex
 #################################################################################
 #               Mamba scan functions that preserve image continuity             #
 #################################################################################
-
-def get_continuous_paths(N):
-    # Note that N is always even since we use image resolution of 256, 512, 1024 with the SD VAE encoder
-    paths_lr = []
-    reverse_lr = []
-    for start_row, start_col, dir_row, dir_col in [
-        (0, 0, 1, 1),
-        (N - 1, 0, -1, 1),
-    ]:
-        path = lr_tranverse(N, start_row, start_col, dir_row, dir_col)
-        paths_lr.append(path)
-        reverse_lr.append(reverse_permut(path))
-    
-
-    paths_tb = []
-    reverse_tb = []
-    for start_row, start_col, dir_row, dir_col in [
-        (N - 1, 0, -1, 1),
-        (N - 1, N - 1, -1, -1),
-    ]:
-        path =tb_tranverse(N, start_row, start_col, dir_row, dir_col)
-        paths_tb.append(path)
-        reverse_tb.append(reverse_permut(path))
-    
-    
-    return paths_lr, paths_tb, reverse_lr, reverse_tb
-    
-
-def lr_tranverse(N,start_row=0, start_col=0, dir_row=1, dir_col=1):
-    path = []
-    for i in range(N):
-        for j in range(N):
-            # If the row number is even, move right; otherwise, move left
-            col = j if i % 2 == 0 else N - 1 - j
-            path.append((start_row + dir_row * i) * N + start_col + dir_col * col)
-    return path
-
-def tb_tranverse(N, start_row=0, start_col=0, dir_row=1, dir_col=1):
-    path = []
-    for j in range(N):
-        for i in range(N):
-            # If the column number is even, move down; otherwise, move up
-            row = i if j % 2 == 0 else N - 1 - i
-            path.append((start_row + dir_row * row) * N + start_col + dir_col * j)
-    return path
-
-def reverse_permut(permutation):
-    n = len(permutation)
-    reverse = [0] * n
-    for i in range(n):
-        reverse[permutation[i]] = i
-    return reverse
-
-
-def reverse_index_select(x, indices, dim, original_size):
-    """
-    Reverses the torch.index_select operation.
-    
-    Args:
-    x (torch.Tensor): The tensor that was output by index_select.
-    indices (torch.Tensor): The indices used in the original index_select operation.
-    dim (int): The dimension along which the indexing was done.
-    original_size (int): The original size of the dimension that was indexed.
-    
-    Returns:
-    torch.Tensor: A tensor with the same shape as the original tensor before index_select.
-    """
-    # Create an output tensor filled with zeros
-    output_shape = list(x.shape)
-    output_shape[dim] = original_size
-    output = torch.zeros(output_shape, dtype=x.dtype, device=x.device)
-
-    # Use indexing to place the values back in their original positions
-    if dim == 0:
-        output[indices] = x
-    elif dim == 1:
-        output[:, indices] = x
-    else:
-        # For higher dimensions, we need to construct the proper indexing
-        idx = [slice(None)] * len(output_shape)
-        idx[dim] = indices
-        output[idx] = x
-
-    return output
-
-class EfficientScan(torch.autograd.Function):
-    # [B, C, H, W] -> [B, 4, C, H * W] (original)
-    # [B, C, H, W] -> [B, 4, C, H/w * W/w]
-    @staticmethod
-    def forward(ctx, x: torch.Tensor, step_size=2): # [B, C, H, W] -> [B, 4, H/w * W/w]
-        B, C, N_window, W, H = x.size()
-        N= W
-
-
-        C = int(C/num_scans)
-        split_indexes = [C,C,C,C]
-        x1, x2, x3, x4 = torch.split(x, split_indexes, dim=1)
-
-        xs = x.new_empty((B, num_scans, C, N_window, H * W))
-
-        ctx.shape = (B, num_scans, C, N_window, H * W)
-        ctx.H = H
-        ctx.W = W
-
-        paths_lr, paths_tb, reverse_lr, reverse_tb = get_continuous_paths(N)
-        paths_lr = torch.tensor(paths_lr, device=x.device, dtype=torch.long)
-        paths_tb = torch.tensor(paths_tb, device=x.device, dtype=torch.long)
-        reverse_lr = torch.tensor(reverse_lr, device=x.device, dtype=torch.long)
-        reverse_tb = torch.tensor(reverse_tb, device=x.device, dtype=torch.long)
-        
-
-        xs[:, 0] = torch.index_select(x1.contiguous().flatten(-2,-1), -1, paths_lr[0])
-        xs[:, 1] = torch.index_select(x2.contiguous().flatten(-2,-1), -1, paths_lr[1])
-        xs[:, 2] = torch.index_select(x3.contiguous().flatten(-2,-1), -1, paths_tb[0])
-        xs[:, 3] = torch.index_select(x4.contiguous().flatten(-2,-1), -1, paths_tb[1])
-    
-        
-
-        return xs, paths_lr, paths_tb, reverse_lr, reverse_tb
-
-    
-    @staticmethod
-    def backward(ctx, grad_xs: torch.Tensor): # [B, 4, H/w * W/w] -> [B, C, H, W]
-
-        # grad_xs has size B, num_scans, C, N_window, H*W
-
-        B, num_scans, C, N_window, L = ctx.shape
-        H = ctx.H 
-        W = ctx.W
-
-        grad_x = grad_xs.new_empty((B, 4, C, N_window, H, W))
-        
-        grad_xs = grad_xs.view(B, 4, C, N_window, H, W)
-        
-        grad_x[:, 0, :, :, :] = grad_xs[:, 0].reshape(B, C, newH, newW)
-        grad_x[:, 1, :, :, :] = grad_xs[:, 1].reshape(B, C, newW, newH).transpose(dim0=2, dim1=3)
-        grad_x[:, 2, :, :, :] = grad_xs[:, 2].reshape(B, C, newH, newW)
-        grad_x[:, 3, :, :, :] = grad_xs[:, 3].reshape(B, C, newW, newH).transpose(dim0=2, dim1=3)
-
-        return grad_x, None 
-
-class EfficientMerge(torch.autograd.Function): # [B, 4, C, H/w * W/w] -> [B, C, H*W]
-    @staticmethod
-    def forward(ctx, ys: torch.Tensor, ori_h: int, ori_w: int, step_size=2):
-        B, K, C, L = ys.shape
-        H, W = math.ceil(ori_h / step_size), math.ceil(ori_w / step_size)
-        ctx.shape = (H, W)
-        ctx.ori_h = ori_h
-        ctx.ori_w = ori_w
-        ctx.step_size = step_size
-
-
-        new_h = H * step_size
-        new_w = W * step_size
-
-        y = ys.new_empty((B, C, new_h, new_w))
-
-
-        y[:, :, ::step_size, ::step_size] = ys[:, 0].reshape(B, C, H, W)
-        y[:, :, 1::step_size, ::step_size] = ys[:, 1].reshape(B, C, W, H).transpose(dim0=2, dim1=3)
-        y[:, :, ::step_size, 1::step_size] = ys[:, 2].reshape(B, C, H, W)
-        y[:, :, 1::step_size, 1::step_size] = ys[:, 3].reshape(B, C, W, H).transpose(dim0=2, dim1=3)
-        
-        if ori_h != new_h or ori_w != new_w:
-            y = y[:, :, :ori_h, :ori_w].contiguous()
-
-        y = y.view(B, C, -1)
-        return y
-    
-    @staticmethod
-    def backward(ctx, grad_x: torch.Tensor): # [B, C, H*W] -> [B, 4, C, H/w * W/w]
-
-        H, W = ctx.shape
-        B, C, L = grad_x.shape
-        step_size = ctx.step_size
-
-        grad_x = grad_x.view(B, C, ctx.ori_h, ctx.ori_w)
-
-        if ctx.ori_w % step_size != 0:
-            pad_w = step_size - ctx.ori_w % step_size
-            grad_x = F.pad(grad_x, (0, pad_w, 0, 0))  
-        W = grad_x.shape[3]
-
-        if ctx.ori_h % step_size != 0:
-            pad_h = step_size - ctx.ori_h % step_size
-            grad_x = F.pad(grad_x, (0, 0, 0, pad_h))
-        H = grad_x.shape[2]
-        B, C, H, W = grad_x.shape
-        H = H // step_size
-        W = W // step_size
-        grad_xs = grad_x.new_empty((B, 4, C, H*W)) 
-
-        grad_xs[:, 0] = grad_x[:, :, ::step_size, ::step_size].reshape(B, C, -1) 
-        grad_xs[:, 1] = grad_x.transpose(dim0=2, dim1=3)[:, :, ::step_size, 1::step_size].reshape(B, C, -1)
-        grad_xs[:, 2] = grad_x[:, :, ::step_size, 1::step_size].reshape(B, C, -1)
-        grad_xs[:, 3] = grad_x.transpose(dim0=2, dim1=3)[:, :, 1::step_size, 1::step_size].reshape(B, C, -1)
-        
-        return grad_xs, None, None, None         
-
-
-# Todo accelerate this, expecially backprop
-def cross_scan_continuous(x, num_scans =4, split=False):
-    B, C, N_window, W, H = x.size()
-    N= W
-
-    if split and C>1:
-        C = int(C/num_scans)
-        split_indexes = [C,C,C,C]
-        x1, x2, x3, x4 = torch.split(x, split_indexes, dim=1)
-
-    xs = x.new_empty((B, num_scans, C, N_window, H * W))
-    
-    paths_lr, paths_tb, reverse_lr, reverse_tb = get_continuous_paths(N)
-    paths_lr = torch.tensor(paths_lr, device=x.device, dtype=torch.long)
-    paths_tb = torch.tensor(paths_tb, device=x.device, dtype=torch.long)
-    reverse_lr = torch.tensor(reverse_lr, device=x.device, dtype=torch.long)
-    reverse_tb = torch.tensor(reverse_tb, device=x.device, dtype=torch.long)
-    
-    if split and C>1:
-        xs[:, 0] = torch.index_select(x1.flatten(-2,-1), -1, paths_lr[0])
-        xs[:, 1] = torch.index_select(x2.flatten(-2,-1), -1, paths_lr[1])
-        xs[:, 2] = torch.index_select(x3.flatten(-2,-1), -1, paths_tb[0])
-        xs[:, 3] = torch.index_select(x4.flatten(-2,-1), -1, paths_tb[1])
-    
-    else:
-        for i in range(paths_lr.size(0)):
-            xs[:, i] = torch.index_select(x.flatten(-2,-1), -1, paths_lr[i])
-            
-        for i in range(paths_tb.size(0)):
-            xs[:, i+num_scans//2] = torch.index_select(x.flatten(-2,-1), -1, paths_tb[i])
-    
-    return xs, paths_lr, paths_tb, reverse_lr, reverse_tb
-    
-# Todo accelerate this, expecially backprop
-def cross_merge_continuous(ys, paths_lr, paths_tb, reverse_lr, reverse_tb, split=False):
-    B, K, D, N_window, H, W = ys.shape
-    L = W*H
-
-
-    ys = ys.view(B, K, D, N_window, -1)
-    ys = ys.permute(0,2,3,1,4) # B, D, N_window, K, L
-    
-    corresponding_scan_paths = torch.concat([reverse_lr,reverse_tb], dim=0).view(1,1,1,K,L)
-    corresponding_scan_paths = corresponding_scan_paths.repeat(B,D,N_window,1,1)
-    y = torch.gather(ys, -1, corresponding_scan_paths)
-
-    if split:
-        return y.permute(0,3,1,2,4).reshape(B,4*D,N_window,L)
-
-    y = torch.sum(y,dim=2) # B, D, L
-    return y    
-
-
 def rotate_every_two(x):
     x1 = x[:, :, :, :, ::2]
     x2 = x[:, :, :, :, 1::2]
@@ -288,44 +33,14 @@ def theta_shift(x, sin, cos):
 
 
 # fvcore flops =======================================
-def flops_selective_scan_fn(B=1, L=256, D=768, N=16, with_D=True, with_Z=False, with_complex=False):
-    """
-    u: r(B D L)
-    delta: r(B D L)
-    A: r(D N)
-    B: r(B N L)
-    C: r(B N L)
-    D: r(D)
-    z: r(B D L)
-    delta_bias: r(D), fp32
-    
-    ignores:
-        [.float(), +, .softplus, .shape, new_zeros, repeat, stack, to(dtype), silu] 
-    """
-    assert not with_complex 
-    # https://github.com/state-spaces/mamba/issues/110
-    flops = 9 * B * L * D * N
-    if with_D:
-        flops += B * D * L
-    if with_Z:
-        flops += B * D * L    
-    return flops
-
 def print_jit_input_names(inputs):
     print("input params: ", end=" ", flush=True)
-    try: 
+    try:
         for i in range(10):
             print(inputs[i].debugName(), end=" ", flush=True)
     except Exception as e:
         pass
     print("", flush=True)
-
-def selective_scan_flop_jit(inputs, outputs):
-    print_jit_input_names(inputs)
-    B, D, L = inputs[0].type().sizes()
-    N = inputs[2].type().sizes()[1]
-    flops = flops_selective_scan_fn(B=B, L=L, D=D, N=N, with_D=True, with_Z=False)
-    return flops
 
 
 class SelectiveScanOflex(torch.autograd.Function):
@@ -336,7 +51,7 @@ class SelectiveScanOflex(torch.autograd.Function):
         out, x, *rest = selective_scan_cuda_oflex.fwd(u, delta, A, B, C, D, delta_bias, delta_softplus, 1, oflex)
         ctx.save_for_backward(u, delta, A, B, C, D, delta_bias, x)
         return out
-    
+
     @staticmethod
     @torch.cuda.amp.custom_bwd
     def backward(ctx, dout, *args):
@@ -364,7 +79,7 @@ class RoPE(nn.Module):
         angle = angle.unsqueeze(-1).repeat(1, 2).flatten()
         self.register_buffer('angle', angle)
 
-    
+
     def forward(self, slen):
         '''
         slen: (h, w)
@@ -799,14 +514,32 @@ class MLP(nn.Module):
 
 
 class SegMANDecoder(BaseModel):
-    def __init__(self, image_size=512,channel_split=False,short_cut=False, interpolate_mode='bilinear',use_rpb=False,
-                  **kwargs):
-        super(SegMANDecoder, self).__init__(input_transform="multiple_select", **kwargs) #input_transform='multiple_select'
-        image_size = to_2tuple(image_size)
-        image_size = [(image_size[0]//2**(i+2), image_size[1]//2**(i+2)) for i in range(4)]
-        
+    default_conf = {
+        "predict_uncertainty": True,
+        "channels": 144,
+        "in_channels": [64, 144, 288, 512],
+        "in_index": [0, 1, 2, 3],
+        "feat_proj_dim": 288,
+        "num_classes": 150,
+        "dropout_ratio": 0.1,
+        "short_cut": False,
+        "interpolate_mode": 'bilinear',
+        "with_low_level": True,
+    }
 
-        self.embed_dim = kwargs['channels']
+    def _init(self, conf):
+        self.num_classes = conf.num_classes
+        self.in_channels = conf.in_channels
+        self.in_index = conf.in_index
+        self.embed_dim = conf.channels
+        self.norm_cfg = dict(type='SyncBN', requires_grad=True)
+
+        self.conv_seg = nn.Conv2d(self.embed_dim, self.num_classes, kernel_size=1)
+        self.dropout_ratio = conf.dropout_ratio
+        if self.dropout_ratio > 0:
+            self.dropout = nn.Dropout2d(self.dropout_ratio)
+        else:
+            self.dropout = None
 
         # downsample using convolutions
         self.conv_downsample_2 = ConvModule(
@@ -817,10 +550,10 @@ class SegMANDecoder(BaseModel):
                         self.embed_dim, self.embed_dim*4, kernel_size=5, stride=4, padding=1,
                         norm_cfg=dict(type='SyncBN', requires_grad=True))
 
-        self.feat_proj_dim = kwargs['feat_proj_dim']
+        self.feat_proj_dim = conf.feat_proj_dim
 
         # try using all features at once
-        self.short_cut = short_cut
+        self.short_cut = conf.short_cut
         self.linear_c4 = MLP(self.in_channels[-1], self.feat_proj_dim)
         self.linear_c3 = MLP(self.in_channels[2], self.feat_proj_dim)
         self.linear_c2 = MLP(self.in_channels[1], self.feat_proj_dim)
@@ -863,25 +596,10 @@ class SegMANDecoder(BaseModel):
                                 kernel_size=1,
                                 norm_cfg=dict(type='SyncBN', requires_grad=True)) 
 
-        self.interpolate_mode = interpolate_mode
+        self.interpolate_mode = conf.interpolate_mode
 
 
-    def forward_mlp_decoder(self, inputs):
-        c1, c2, c3, c4 = inputs
-
-        _c4 = self.linear_c4(c4)
-        _c3 = self.linear_c3(c3)
-        _c2 = self.linear_c2(c2)
-   
-        _c4 = resize(_c4, size=inputs[1].size()[2:],mode='bilinear',align_corners=False).contiguous()
-        _c3 = resize(_c3, size=inputs[1].size()[2:],mode='bilinear',align_corners=False).contiguous()
-       
-        _c = self.linear_fuse(torch.cat([_c4, _c3, _c2], dim=1))
-        
-        return _c, _c2, _c3, _c4
-
-
-    def forward_winssm(self, x: torch.Tensor, c2, c3, c4, c1=None):
+    def forward_winssm(self, x: torch.Tensor, c2, c3, c4):
         out = [self.short_path(x), 
                   resize(self.image_pool(x),
                         size=x.size()[2:],
@@ -924,9 +642,24 @@ class SegMANDecoder(BaseModel):
         return out
 
  
-    def forward(self, inputs):
-        x = self._transform_inputs(inputs)
-        x, c2, c3, c4 = self.forward_mlp_decoder(x)
+    def _forward(self, inputs):
+        c1, c2, c3, c4 = [inputs[i] for i in self.in_index]
+
+        c2 = self.linear_c2(c2)
+        c3 = self.linear_c3(c3)
+        c4 = self.linear_c4(c4)
+        c3 = resize(c3, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
+        c4 = resize(c4, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
+
+        x = self.linear_fuse(torch.cat([c4, c3, c2], dim=1))
+
         x = self.forward_winssm(x, c2, c3, c4)
-        output = self.cls_seg(x)
+
+        if self.dropout is not None:
+            x = self.dropout(x)
+        output = self.conv_seg(x)
         return output
+
+
+    def loss(self, pred, data):
+        raise NotImplementedError
