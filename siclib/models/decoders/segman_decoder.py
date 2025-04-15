@@ -534,6 +534,7 @@ class SegMANDecoder(BaseModel):
         self.embed_dim = conf.channels
         self.norm_cfg = dict(type='SyncBN', requires_grad=True)
         self.conv_cfg = None
+        self.act_cfg = dict(type='ReLU')
 
         self.conv_seg = nn.Conv2d(self.embed_dim, self.num_classes, kernel_size=1)
         self.dropout_ratio = conf.dropout_ratio
