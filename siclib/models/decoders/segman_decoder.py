@@ -528,7 +528,7 @@ class SegMANDecoder(BaseModel):
         "short_cut": False,
         "interpolate_mode": 'bilinear',
         "with_low_level": True,
-        "feature_resample": True,
+        "feature_resample": False,
         "feature_resample_group": 4,
         "compress_ratio": 4,
     }
