@@ -880,7 +880,7 @@ def _cfg(url=None, **kwargs):
 
 class SegMANEncoder(BaseModel):
     default_conf = {
-        "image_size": 320,
+        "image_size": 512,
         "in_channels": 3,
     }
 
