@@ -646,7 +646,7 @@ class SegMANDecoder(BaseModel):
 
         print(feat.shape)
 
-        _, _c2, _c3 = self.freqfusion_c3(hr_feat=_c3, lr_feat=feat)
+        _, _c2, _c3 = self.freqfusion_c3(hr_feat=_c2, lr_feat=feat)
         print(_c2.shape)
         print(_c3.shape)
         if self.feature_resample:
