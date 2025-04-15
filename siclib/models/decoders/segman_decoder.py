@@ -642,7 +642,8 @@ class SegMANDecoder(BaseModel):
         return out
 
  
-    def _forward(self, inputs):
+    def _forward(self, features):
+        inputs = [features["hl"][i] for i in self.in_index]
         c1, c2, c3, c4 = [inputs[i] for i in self.in_index]
 
         c2 = self.linear_c2(c2)

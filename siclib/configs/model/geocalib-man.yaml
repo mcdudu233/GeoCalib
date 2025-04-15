@@ -8,22 +8,22 @@ backbone:
   weights: weights/SegMAN_Encoder_s.pth.tar
 
 perspective_decoder:
-  name: decoders.perspective_decoder
+  name: decoders.perspective_decoder_man
 
   up_decoder:
-    name: decoders.up_decoder
+    name: decoders.up_decoder_man
     loss_type: l1
     use_uncertainty_loss: true
     decoder:
-      name: decoders.light_hamburger
+      name: decoders.segman_decoder
       predict_uncertainty: true
 
   latitude_decoder:
-    name: decoders.latitude_decoder
+    name: decoders.latitude_decoder_man
     loss_type: l1
     use_uncertainty_loss: true
     decoder:
-      name: decoders.light_hamburger
+      name: decoders.segman_decoder
       predict_uncertainty: true
 
 optimizer:
