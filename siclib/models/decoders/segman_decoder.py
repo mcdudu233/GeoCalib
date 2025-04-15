@@ -570,28 +570,16 @@ class SegMANDecoder(BaseModel):
         self.linear_c2 = MLP(self.in_channels[1], self.feat_proj_dim)
 
         self.feature_resample = conf.feature_resample
-        # self.freqfusion_c3 = FreqFusion(
-        #     hr_channels=c, lr_channels=pre_c,
-        #     feature_resample=self.feature_resample, feature_resample_group=conf.feature_resample_group,
-        #     hamming_window=False, compressed_channels=(pre_c + c) // conf.compress_ratio
-        # )
-        # self.freqfusion_c4 = FreqFusion(
-        #     hr_channels=c, lr_channels=pre_c,
-        #     feature_resample=self.feature_resample, feature_resample_group=conf.feature_resample_group,
-        #     hamming_window=False, compressed_channels=(pre_c + c) // conf.compress_ratio
-        # )
-
-        lr_hr_channels = self.in_channels[::-1]
-        pre_c = lr_hr_channels[0]
-        for c in lr_hr_channels[1:3]:
-            # freqfusion = FreqFusion(
-            #     hr_channels=c, lr_channels=pre_c,
-            #     feature_resample=self.feature_resample, feature_resample_group=conf.feature_resample_group,
-            #     hamming_window=False, compressed_channels=(pre_c + c) // conf.compress_ratio
-            # )
-            print("hr:" + str() + " lr:" + str())
-            # self.freqfusions.append(freqfusion)
-            pre_c += c
+        self.freqfusion_c3 = FreqFusion(
+            hr_channels=self.feat_proj_dim, lr_channels=self.feat_proj_dim,
+            feature_resample=self.feature_resample, feature_resample_group=conf.feature_resample_group,
+            hamming_window=False, compressed_channels=(self.feat_proj_dim * 2) // conf.compress_ratio
+        )
+        self.freqfusion_c4 = FreqFusion(
+            hr_channels=self.feat_proj_dim, lr_channels=self.feat_proj_dim,
+            feature_resample=self.feature_resample, feature_resample_group=conf.feature_resample_group,
+            hamming_window=False, compressed_channels=(self.feat_proj_dim * 2) // conf.compress_ratio
+        )
 
         self.linear_fuse = ConvModule(
                         in_channels=self.feat_proj_dim*3,
@@ -646,9 +634,17 @@ class SegMANDecoder(BaseModel):
         _c4 = self.linear_c4(c4)
         _c3 = self.linear_c3(c3)
         _c2 = self.linear_c2(c2)
-        print(_c2.shape)
-        print(_c3.shape)
+
         print(_c4.shape)
+        _, hires_feat, lowres_feat = self.freqfusion_c4(hr_feat=_c3, lr_feat=_c4)
+        print(hires_feat.shape)
+        print(lowres_feat.shape)
+        if self.feature_resample:
+            b, _, h, w = hires_feat.shape
+            lowres_feat = torch.cat([hires_feat.reshape(b * self.feature_resample_group, -1, h, w),
+                                     lowres_feat.reshape(b * self.feature_resample_group, -1, h, w)], dim=1).reshape(b, -1, h, w)
+        else:
+            lowres_feat = torch.cat([hires_feat, lowres_feat], dim=1)
 
         _c4 = resize(_c4, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
         _c3 = resize(_c3, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
