@@ -570,14 +570,15 @@ class SegMANDecoder(BaseModel):
         self.linear_c2 = MLP(self.in_channels[1], self.feat_proj_dim)
 
         self.feature_resample = conf.feature_resample
+        self.feature_resample_group = conf.feature_resample_group
         self.freqfusion_c3 = FreqFusion(
             hr_channels=self.feat_proj_dim, lr_channels=self.feat_proj_dim,
-            feature_resample=self.feature_resample, feature_resample_group=conf.feature_resample_group,
+            feature_resample=self.feature_resample, feature_resample_group=self.feature_resample_group,
             hamming_window=False, compressed_channels=(self.feat_proj_dim * 2) // conf.compress_ratio
         )
         self.freqfusion_c4 = FreqFusion(
             hr_channels=self.feat_proj_dim, lr_channels=self.feat_proj_dim,
-            feature_resample=self.feature_resample, feature_resample_group=conf.feature_resample_group,
+            feature_resample=self.feature_resample, feature_resample_group=self.feature_resample_group,
             hamming_window=False, compressed_channels=(self.feat_proj_dim * 2) // conf.compress_ratio
         )
 
