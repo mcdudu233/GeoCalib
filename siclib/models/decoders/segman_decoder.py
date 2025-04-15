@@ -18,7 +18,7 @@ from timm.models.layers import DropPath, to_2tuple
 from siclib.models.utils.csm_triton import CrossScanTriton, CrossMergeTriton
 import selective_scan_cuda_oflex
 
-from siclib.models.utils.modules import FeatureFusionBlock
+from siclib.models.utils.modules import FeatureFusionBlock, FreqFusion
 
 
 #################################################################################
@@ -528,6 +528,9 @@ class SegMANDecoder(BaseModel):
         "short_cut": False,
         "interpolate_mode": 'bilinear',
         "with_low_level": True,
+        "feature_resample": True,
+        "feature_resample_group": 4,
+        "compress_ratio": 4,
     }
 
     def _init(self, conf):
@@ -565,6 +568,30 @@ class SegMANDecoder(BaseModel):
         self.linear_c4 = MLP(self.in_channels[-1], self.feat_proj_dim)
         self.linear_c3 = MLP(self.in_channels[2], self.feat_proj_dim)
         self.linear_c2 = MLP(self.in_channels[1], self.feat_proj_dim)
+
+        # self.feature_resample = conf.feature_resample
+        # self.freqfusion_c3 = FreqFusion(
+        #     hr_channels=c, lr_channels=pre_c,
+        #     feature_resample=self.feature_resample, feature_resample_group=conf.feature_resample_group,
+        #     hamming_window=False, compressed_channels=(pre_c + c) // conf.compress_ratio
+        # )
+        # self.freqfusion_c4 = FreqFusion(
+        #     hr_channels=c, lr_channels=pre_c,
+        #     feature_resample=self.feature_resample, feature_resample_group=conf.feature_resample_group,
+        #     hamming_window=False, compressed_channels=(pre_c + c) // conf.compress_ratio
+        # )
+
+        lr_hr_channels = self.in_channels[::-1]
+        pre_c = lr_hr_channels[0]
+        for c in lr_hr_channels[1:3]:
+            freqfusion = FreqFusion(
+                hr_channels=c, lr_channels=pre_c,
+                feature_resample=self.feature_resample, feature_resample_group=conf.feature_resample_group,
+                hamming_window=False, compressed_channels=(pre_c + c) // conf.compress_ratio
+            )
+            print("hr:" + c + " lr:" + pre_c)
+            self.freqfusions.append(freqfusion)
+            pre_c += c
 
         self.linear_fuse = ConvModule(
                         in_channels=self.feat_proj_dim*3,
@@ -613,6 +640,24 @@ class SegMANDecoder(BaseModel):
             self.ll_fusion = FeatureFusionBlock(self.out_channels, upsample=False)
 
 
+    def forward_mlp_decoder(self, inputs):
+        c1, c2, c3, c4 = inputs
+
+        _c4 = self.linear_c4(c4)
+        _c3 = self.linear_c3(c3)
+        _c2 = self.linear_c2(c2)
+        print(_c2.shape)
+        print(_c3.shape)
+        print(_c4.shape)
+
+        _c4 = resize(_c4, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
+        _c3 = resize(_c3, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
+
+        _c = self.linear_fuse(torch.cat([_c4, _c3, _c2], dim=1))
+
+        return _c, _c2, _c3, _c4
+
+
     def forward_winssm(self, x: torch.Tensor, c2, c3, c4):
         out = [self.short_path(x), 
                   resize(self.image_pool(x),
@@ -657,16 +702,9 @@ class SegMANDecoder(BaseModel):
 
  
     def _forward(self, features):
-        inputs = [features["hl"][i] for i in self.in_index]
-        c1, c2, c3, c4 = [inputs[i] for i in self.in_index]
+        x = [features["hl"][i] for i in self.in_index]
 
-        c2 = self.linear_c2(c2)
-        c3 = self.linear_c3(c3)
-        c4 = self.linear_c4(c4)
-        c3 = resize(c3, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
-        c4 = resize(c4, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
-
-        x = self.linear_fuse(torch.cat([c4, c3, c2], dim=1))
+        x, c2, c3, c4 = self.forward_mlp_decoder(x)
 
         x = self.forward_winssm(x, c2, c3, c4)
 

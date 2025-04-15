@@ -989,7 +989,7 @@ class SegMANEncoder(BaseModel):
 
 
     def flexible_load(self, state_dict):
-        # 预训练模型和实际不一致
+        # TODO: 预训练模型和实际不一致
         state_dict.pop("layers.6.blocks.0.token_mixer.rpb.1")
         state_dict.pop("layers.6.blocks.1.token_mixer.rpb.1")
         state_dict.pop("layers.6.blocks.2.token_mixer.rpb.1")
