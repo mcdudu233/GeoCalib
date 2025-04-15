@@ -12,7 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange, repeat
 from mmcv.cnn import ConvModule
-from natten.functional import na2d, na2d_av, na2d_qk, natten2dav, natten2dqkrpb
+from natten.functional import na2d, na2d_av, na2d_qk
 from timm.models.layers import DropPath, to_2tuple
 
 from siclib.models.utils.csm_triton import CrossScanTriton, CrossMergeTriton
