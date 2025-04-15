@@ -943,12 +943,6 @@ class SegMANEncoder(BaseModel):
 
         self.apply(self._init_weights)
 
-        checkpoint = torch.load("weights/SegMAN_Encoder_s.pth.tar", map_location='cpu', weights_only=False)
-        state_dict_name = 'state_dict_ema'
-        state_dict = checkpoint[state_dict_name]
-        self.load_state_dict(state_dict, strict=False)
-        print(f"loaded state dict using {state_dict_name} from {self.pretrained}")
-
         if torch.distributed.is_initialized():
             self = nn.SyncBatchNorm.convert_sync_batchnorm(self)
 
@@ -992,3 +986,13 @@ class SegMANEncoder(BaseModel):
     def loss(self, pred, data):
         """Compute the loss."""
         raise NotImplementedError
+
+
+    def flexible_load(self, state_dict):
+        for key in state_dict.keys():
+            print(key + state_dict[key].shape)
+
+        for key in self.state_dict().keys():
+            print(key + self.state_dict()[key].shape)
+
+        # super().flexible_load(state_dict)
