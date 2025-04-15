@@ -577,7 +577,7 @@ class SegMANDecoder(BaseModel):
             hamming_window=False, compressed_channels=(self.feat_proj_dim * 2) // conf.compress_ratio
         )
         self.freqfusion_c3 = FreqFusion(
-            hr_channels=self.feat_proj_dim, lr_channels=self.feat_proj_dim * 2,
+            hr_channels=self.feat_proj_dim, lr_channels=self.feat_proj_dim,
             feature_resample=self.feature_resample, feature_resample_group=self.feature_resample_group,
             hamming_window=False, compressed_channels=(self.feat_proj_dim * 2) // conf.compress_ratio
         )
@@ -637,28 +637,10 @@ class SegMANDecoder(BaseModel):
         _c2 = self.linear_c2(c2)
 
         _, _c3, _c4 = self.freqfusion_c4(hr_feat=_c3, lr_feat=_c4)
-        if self.feature_resample:
-            b, _, h, w = _c3.shape
-            feat = torch.cat([_c3.reshape(b * self.feature_resample_group, -1, h, w),
-                                     _c4.reshape(b * self.feature_resample_group, -1, h, w)], dim=1).reshape(b, -1, h, w)
-        else:
-            feat = torch.cat([_c3, _c4], dim=1)
+        _, _c2, _c4 = self.freqfusion_c4(hr_feat=_c2, lr_feat=_c4)
+        _, _c2, _c3 = self.freqfusion_c3(hr_feat=_c2, lr_feat=_c3)
 
-        _, _c2, _c3 = self.freqfusion_c3(hr_feat=_c2, lr_feat=feat)
-        print(_c2.shape)
-        print(_c3.shape)
-        if self.feature_resample:
-            b, _, h, w = _c3.shape
-            feat = torch.cat([_c3.reshape(b * self.feature_resample_group, -1, h, w),
-                                     _c4.reshape(b * self.feature_resample_group, -1, h, w)], dim=1).reshape(b, -1, h, w)
-        else:
-            feat = torch.cat([_c2, _c3], dim=1)
-
-        _, _, _c4 = self.freqfusion_c4(hr_feat=_c2, lr_feat=_c4)
-        print(feat.shape)
-        print((torch.cat([_c4, _c3, _c2], dim=1)).shape)
-
-        _c = self.linear_fuse(feat)
+        _c = self.linear_fuse(torch.cat([_c4, _c3, _c2], dim=1))
 
         return _c, _c2, _c3, _c4
 
