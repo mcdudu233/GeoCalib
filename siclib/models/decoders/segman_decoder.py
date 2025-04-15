@@ -518,6 +518,7 @@ class SegMANDecoder(BaseModel):
         "predict_uncertainty": True,
         "channels": 144,
         "in_channels": [64, 144, 288, 512],
+        "out_channels": 144,
         "in_index": [0, 1, 2, 3],
         "feat_proj_dim": 288,
         "num_classes": 150,
@@ -530,6 +531,7 @@ class SegMANDecoder(BaseModel):
     def _init(self, conf):
         self.num_classes = conf.num_classes
         self.in_channels = conf.in_channels
+        self.out_channels = conf.out_channels
         self.in_index = conf.in_index
         self.embed_dim = conf.channels
         self.norm_cfg = dict(type='SyncBN', requires_grad=True)
