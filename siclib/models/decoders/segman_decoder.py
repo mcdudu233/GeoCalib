@@ -520,10 +520,9 @@ class SegMANDecoder(BaseModel):
         "predict_uncertainty": True,
         "channels": 144,
         "in_channels": [64, 144, 288, 512],
-        "out_channels": 144,
+        "out_channels": 64,
         "in_index": [0, 1, 2, 3],
         "feat_proj_dim": 288,
-        "num_classes": 150,
         "dropout_ratio": 0.1,
         "short_cut": False,
         "interpolate_mode": 'bilinear',
@@ -534,7 +533,6 @@ class SegMANDecoder(BaseModel):
     }
 
     def _init(self, conf):
-        self.num_classes = conf.num_classes
         self.in_channels = conf.in_channels
         self.out_channels = conf.out_channels
         self.in_index = conf.in_index
@@ -544,13 +542,6 @@ class SegMANDecoder(BaseModel):
         self.act_cfg = dict(type='ReLU')
         self.align_corners = False
         self.with_ll = conf.with_low_level
-
-        self.conv_seg = nn.Conv2d(self.embed_dim, self.out_channels, kernel_size=1)
-        self.dropout_ratio = conf.dropout_ratio
-        if self.dropout_ratio > 0:
-            self.dropout = nn.Dropout2d(self.dropout_ratio)
-        else:
-            self.dropout = None
 
         # downsample using convolutions
         self.conv_downsample_2 = ConvModule(
@@ -622,9 +613,22 @@ class SegMANDecoder(BaseModel):
 
         self.interpolate_mode = conf.interpolate_mode
 
+        self.conv_seg = nn.Conv2d(self.embed_dim, self.out_channels, kernel_size=1)
+        self.dropout_ratio = conf.dropout_ratio
+        if self.dropout_ratio > 0:
+            self.dropout = nn.Dropout2d(self.dropout_ratio)
+        else:
+            self.dropout = None
+
         if self.with_ll:
-            self.out_conv = ConvModule(
+            self.out_conv1 = ConvModule(
                 self.out_channels, self.out_channels, 3, padding=1, bias=False
+            )
+            self.out_conv2 = ConvModule(
+                self.out_channels, self.out_channels, 3, padding=1, bias=False
+            )
+            self.out_freqfusion = FreqFusion(
+                hr_channels=self.out_channels, lr_channels=self.out_channels
             )
             self.ll_fusion = FeatureFusionBlock(self.out_channels, upsample=False)
 
@@ -636,9 +640,12 @@ class SegMANDecoder(BaseModel):
         _c3 = self.linear_c3(c3)
         _c2 = self.linear_c2(c2)
 
-        _, _c3, _c4 = self.freqfusion_c4(hr_feat=_c3, lr_feat=_c4)
-        _, _c2, _c4 = self.freqfusion_c4(hr_feat=_c2, lr_feat=_c4)
-        _, _c2, _c3 = self.freqfusion_c3(hr_feat=_c2, lr_feat=_c3)
+        _c4 = resize(_c4, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
+        _c3 = resize(_c3, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
+        # TODO: 采用融合块
+        # _, _c3, _c4 = self.freqfusion_c4(hr_feat=_c3, lr_feat=_c4)
+        # _, _c2, _c4 = self.freqfusion_c4(hr_feat=_c2, lr_feat=_c4)
+        # _, _c2, _c3 = self.freqfusion_c3(hr_feat=_c2, lr_feat=_c3)
 
         _c = self.linear_fuse(torch.cat([_c4, _c3, _c2], dim=1))
 
@@ -701,12 +708,16 @@ class SegMANDecoder(BaseModel):
 
         if self.with_ll:
             assert "ll" in features, "Low-level features are required for this model"
-            print(feats.shape)
+            # [b,64,40,40]
             feats = F.interpolate(feats, scale_factor=2, mode="bilinear", align_corners=False)
-            print(feats.shape)
-            feats = self.out_conv(feats)
+            feats = self.out_conv1(feats)
+            # [b,64,80,80]
             feats = F.interpolate(feats, scale_factor=2, mode="bilinear", align_corners=False)
+            feats = self.out_conv2(feats)
+            # [b,64,160,160]
             feats_ll = features["ll"].clone()
+            # 使用融合方法扩大
+            _, feats_ll, feats = self.out_freqfusion(hr_feat=feats_ll, lr_feat=feats)
             feats = self.ll_fusion(feats, feats_ll)
 
         uncertainty = (
