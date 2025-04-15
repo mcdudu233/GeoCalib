@@ -18,6 +18,8 @@ from timm.models.layers import DropPath, to_2tuple
 from siclib.models.utils.csm_triton import CrossScanTriton, CrossMergeTriton
 import selective_scan_cuda_oflex
 
+from siclib.models.utils.modules import FeatureFusionBlock
+
 
 #################################################################################
 #               Mamba scan functions that preserve image continuity             #
@@ -603,6 +605,12 @@ class SegMANDecoder(BaseModel):
                                 norm_cfg=dict(type='SyncBN', requires_grad=True)) 
 
         self.interpolate_mode = conf.interpolate_mode
+
+        if self.with_ll:
+            self.out_conv = ConvModule(
+                self.out_channels, self.out_channels, 3, padding=1, bias=False
+            )
+            self.ll_fusion = FeatureFusionBlock(self.out_channels, upsample=False)
 
 
     def forward_winssm(self, x: torch.Tensor, c2, c3, c4):
