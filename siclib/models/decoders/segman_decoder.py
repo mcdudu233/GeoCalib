@@ -584,11 +584,11 @@ class SegMANDecoder(BaseModel):
         lr_hr_channels = self.in_channels[::-1]
         pre_c = lr_hr_channels[0]
         for c in lr_hr_channels[1:3]:
-            freqfusion = FreqFusion(
-                hr_channels=c, lr_channels=pre_c,
-                feature_resample=self.feature_resample, feature_resample_group=conf.feature_resample_group,
-                hamming_window=False, compressed_channels=(pre_c + c) // conf.compress_ratio
-            )
+            # freqfusion = FreqFusion(
+            #     hr_channels=c, lr_channels=pre_c,
+            #     feature_resample=self.feature_resample, feature_resample_group=conf.feature_resample_group,
+            #     hamming_window=False, compressed_channels=(pre_c + c) // conf.compress_ratio
+            # )
             print("hr:" + str() + " lr:" + str())
             # self.freqfusions.append(freqfusion)
             pre_c += c
