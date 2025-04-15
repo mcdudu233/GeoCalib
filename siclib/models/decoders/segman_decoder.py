@@ -590,7 +590,7 @@ class SegMANDecoder(BaseModel):
                 hamming_window=False, compressed_channels=(pre_c + c) // conf.compress_ratio
             )
             print("hr:" + str() + " lr:" + str())
-            self.freqfusions.append(freqfusion)
+            # self.freqfusions.append(freqfusion)
             pre_c += c
 
         self.linear_fuse = ConvModule(
