@@ -943,7 +943,7 @@ class SegMANEncoder(BaseModel):
 
         self.apply(self._init_weights)
 
-        checkpoint = torch.load("weights/SegMAN_Encoder_s.pth.tar", map_location='cpu', weights_only=True)
+        checkpoint = torch.load("weights/SegMAN_Encoder_s.pth.tar", map_location='cpu', weights_only=False)
         state_dict_name = 'state_dict_ema'
         state_dict = checkpoint[state_dict_name]
         self.load_state_dict(state_dict, strict=False)
