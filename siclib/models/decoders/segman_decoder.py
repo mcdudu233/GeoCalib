@@ -589,7 +589,7 @@ class SegMANDecoder(BaseModel):
                 feature_resample=self.feature_resample, feature_resample_group=conf.feature_resample_group,
                 hamming_window=False, compressed_channels=(pre_c + c) // conf.compress_ratio
             )
-            print("hr:" + c + " lr:" + pre_c)
+            print("hr:" + str() + " lr:" + str())
             self.freqfusions.append(freqfusion)
             pre_c += c
 
