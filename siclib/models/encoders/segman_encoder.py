@@ -989,13 +989,9 @@ class SegMANEncoder(BaseModel):
 
 
     def flexible_load(self, state_dict):
-        print("diff: ")
-        for key in state_dict.keys():
-            if key in self.state_dict().keys():
-                if state_dict[key].shape != self.state_dict()[key].shape:
-                    print(key + ": ", end="")
-                    print(state_dict[key].shape, end="")
-                    print(" and ", end="")
-                    print(self.state_dict()[key].shape)
-
-        # super().flexible_load(state_dict)
+        # 预训练模型和实际不一致
+        state_dict.pop("layers.6.blocks.0.token_mixer.rpb.1")
+        state_dict.pop("layers.6.blocks.1.token_mixer.rpb.1")
+        state_dict.pop("layers.6.blocks.2.token_mixer.rpb.1")
+        state_dict.pop("layers.6.blocks.3.token_mixer.rpb.1")
+        super().flexible_load(state_dict)
