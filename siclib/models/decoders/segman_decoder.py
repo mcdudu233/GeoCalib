@@ -654,6 +654,7 @@ class SegMANDecoder(BaseModel):
         else:
             feat = torch.cat([_c2, _c3], dim=1)
 
+        _, _, _c4 = self.freqfusion_c4(hr_feat=_c2, lr_feat=_c4)
         print(feat.shape)
         print((torch.cat([_c4, _c3, _c2], dim=1)).shape)
 
