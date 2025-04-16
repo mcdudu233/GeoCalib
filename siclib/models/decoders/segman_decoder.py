@@ -717,6 +717,7 @@ class SegMANDecoder(BaseModel):
             # [b,64,160,160]
             feats_ll = features["ll"].clone()
             print(feats.shape)
+            print(feats_ll.shape)
             # 使用融合方法扩大
             _, feats_ll, feats = self.out_freqfusion(hr_feat=feats_ll, lr_feat=feats)
             print(feats.shape)
