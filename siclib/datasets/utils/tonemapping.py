@@ -1,3 +1,4 @@
+import concurrent
 import os
 
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
@@ -269,9 +270,29 @@ def unNormalizeIlluminance(x, scale=5):
     return x
 
 
+def process_single_image(args, processor, fname):
+    """单个图片处理函数"""
+    fname_out = ".".join(fname.split(".")[:-1])
+    out_path = os.path.join(args.out_dir, f"{fname_out}.jpg")
+
+    if os.path.exists(out_path) and not args.overwrite:
+        return
+
+    try:
+        img = cv2.imread(os.path.join(args.hdr_dir, fname), cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
+        if img is None:
+            raise ValueError(f"Failed to read image: {fname}")
+
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        ldr, _ = processor.process(img)
+        ldr = (ldr * 255).astype(np.uint8)
+        cv2.imwrite(out_path, cv2.cvtColor(ldr, cv2.COLOR_RGB2BGR))
+    except Exception as e:
+        print(f"Error processing {fname}: {str(e)}")
+
+
 def main(args):
     processor = LDRfromHDR(
-        # tonemap=("log10", 10),
         tonemap=("gamma", args.gamma),
         orig_scale=False,
         clip=True,
@@ -280,28 +301,19 @@ def main(args):
         noise=0,
     )
 
-    img_list = list(os.listdir(args.hdr_dir))
-    img_list = [f for f in img_list if f.endswith(args.extension)]
-    img_list = [f for f in img_list if not f.startswith("._")]
+    img_list = [f for f in os.listdir(args.hdr_dir)
+                if f.endswith(args.extension) and not f.startswith("._")]
 
-    if not os.path.exists(args.out_dir):
-        os.makedirs(args.out_dir)
+    if not img_list:
+        print("No valid images found")
+        return
 
-    for fname in tqdm(img_list):
-        fname_out = ".".join(fname.split(".")[:-1])
-        out = os.path.join(args.out_dir, f"{fname_out}.jpg")
-        if os.path.exists(out) and not args.overwrite:
-            continue
+    os.makedirs(args.out_dir, exist_ok=True)
 
-        fpath = os.path.join(args.hdr_dir, fname)
-        img = cv2.imread(fpath, cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-        ldr, scale = processor.process(img)
-
-        ldr = (ldr * 255).astype(np.uint8)
-        ldr = cv2.cvtColor(ldr, cv2.COLOR_RGB2BGR)
-        cv2.imwrite(out, ldr)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+        futures = [executor.submit(process_single_image, args, processor, fname) for fname in img_list]
+        for _ in tqdm(concurrent.futures.as_completed(futures), total=len(futures)):
+            pass
 
 
 if __name__ == "__main__":
