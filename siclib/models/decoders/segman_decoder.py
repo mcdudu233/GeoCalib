@@ -541,6 +541,7 @@ class SegMANDecoder(BaseModel):
         self.conv_cfg = None
         self.act_cfg = dict(type='ReLU')
         self.align_corners = False
+        self.predict_uncertainty = conf.predict_uncertainty
         self.with_ll = conf.with_low_level
 
         # downsample using convolutions
@@ -619,6 +620,18 @@ class SegMANDecoder(BaseModel):
             self.dropout = nn.Dropout2d(self.dropout_ratio)
         else:
             self.dropout = None
+
+        if self.predict_uncertainty:
+            self.linear_pred_uncertainty = nn.Sequential(
+                ConvModule(
+                    in_channels=self.out_channels,
+                    out_channels=self.out_channels,
+                    kernel_size=3,
+                    padding=1,
+                    bias=False,
+                ),
+                nn.Conv2d(in_channels=self.out_channels, out_channels=1, kernel_size=1),
+            )
 
         if self.with_ll:
             self.out_conv1 = ConvModule(
@@ -716,12 +729,8 @@ class SegMANDecoder(BaseModel):
             feats = self.out_conv2(feats)
             # [b,64,160,160]
             feats_ll = features["ll"].clone()
-            print(feats.shape)
-            print(feats_ll.shape)
             # 使用融合方法扩大
             _, feats_ll, feats = self.out_freqfusion(hr_feat=feats_ll, lr_feat=feats)
-            print(feats.shape)
-            print(feats_ll.shape)
             feats = self.ll_fusion(feats, feats_ll)
 
         uncertainty = (
