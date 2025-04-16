@@ -716,16 +716,16 @@ class SegMANDecoder(BaseModel):
             feats = self.out_conv2(feats)
             # [b,64,160,160]
             feats_ll = features["ll"].clone()
+            print(feats.shape)
             # 使用融合方法扩大
             _, feats_ll, feats = self.out_freqfusion(hr_feat=feats_ll, lr_feat=feats)
+            print(feats.shape)
+            print(feats_ll.shape)
             feats = self.ll_fusion(feats, feats_ll)
 
         uncertainty = (
             self.linear_pred_uncertainty(feats).squeeze(1) if self.predict_uncertainty else None
         )
-
-        print(feats.shape)
-        print(uncertainty.shape)
 
         return feats, uncertainty
 
