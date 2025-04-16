@@ -406,229 +406,249 @@ def training(rank, conf, output_dir, args):
         conf.train.epochs = conf.train.epochs // (args.n_gpus if args.distributed else 1)
         logger.info(f"Setting epochs to {conf.train.epochs} to match num_steps.")
 
-    while epoch < conf.train.epochs and not stop:
-        tot_it = (len(train_loader) * epoch) * (args.n_gpus if args.distributed else 1)
-        tot_n_samples = tot_it * train_loader.batch_size
+    with torch.cuda.device(device):
+        while epoch < conf.train.epochs and not stop:
+            tot_it = (len(train_loader) * epoch) * (args.n_gpus if args.distributed else 1)
+            tot_n_samples = tot_it * train_loader.batch_size
 
-        if conf.train.num_steps is not None and tot_it > conf.train.num_steps:
-            logger.info(f"Reached max number of steps {conf.train.num_steps}")
-            stop = True
+            if conf.train.num_steps is not None and tot_it > conf.train.num_steps:
+                logger.info(f"Reached max number of steps {conf.train.num_steps}")
+                stop = True
 
-        if rank == 0:
-            logger.info(f"Starting epoch {epoch}")
+            if rank == 0:
+                logger.info(f"Starting epoch {epoch}")
 
-        # we first run the eval
-        if (
-            rank == 0
-            and epoch % conf.train.test_every_epoch == 0
-            and (epoch > 0 or not args.no_test_0)
-        ):
-            for bname, eval_conf in conf.get("benchmarks", {}).items():
-                logger.info(f"Running eval on {bname}")
-                s, f, r = run_benchmark(
-                    bname,
-                    eval_conf,
-                    EVAL_PATH / bname / args.experiment / str(epoch),
-                    model.eval(),
-                )
-                for metric_name, value in s.items():
-                    writer.add_scalar(f"test/{bname}/{metric_name}", value, step=tot_n_samples)
-                for fig_name, fig in f.items():
-                    writer.add_figure(f"figures/{bname}/{fig_name}", fig, step=tot_n_samples)
-
-                str_results = [f"{k} {v:.3E}" for k, v in s.items() if isinstance(v, float)]
-                if rank == 0:
-                    logger.info(f'[Test {bname}] {{{", ".join(str_results)}}}')
-
-        # set the seed
-        set_seed(conf.train.seed + epoch)
-
-        # update learning rate
-        if conf.train.lr_schedule.on_epoch and epoch > 0:
-            old_lr = optimizer.param_groups[0]["lr"]
-            lr_scheduler.step(epoch)
-            logger.info(f'lr changed from {old_lr} to {optimizer.param_groups[0]["lr"]}')
-
-        if args.distributed:
-            train_loader.sampler.set_epoch(epoch)
-        if epoch > 0 and conf.train.dataset_callback_fn and not args.overfit:
-            loaders = [train_loader]
-            if conf.train.dataset_callback_on_val:
-                loaders += [val_loader]
-            for loader in loaders:
-                if isinstance(loader.dataset, torch.utils.data.Subset):
-                    getattr(loader.dataset.dataset, conf.train.dataset_callback_fn)(
-                        conf.train.seed + epoch
+            # we first run the eval
+            if (
+                    rank == 0
+                    and epoch % conf.train.test_every_epoch == 0
+                    and (epoch > 0 or not args.no_test_0)
+            ):
+                for bname, eval_conf in conf.get("benchmarks", {}).items():
+                    logger.info(f"Running eval on {bname}")
+                    s, f, r = run_benchmark(
+                        bname,
+                        eval_conf,
+                        EVAL_PATH / bname / args.experiment / str(epoch),
+                        model.eval(),
                     )
-                else:
-                    getattr(loader.dataset, conf.train.dataset_callback_fn)(conf.train.seed + epoch)
-        for it, data in enumerate(train_loader):
-            # logger.info(f"Starting iteration {it} - epoch {epoch} - rank {rank}")
-            tot_it = (len(train_loader) * epoch + it) * (args.n_gpus if args.distributed else 1)
-            tot_n_samples = tot_it
-            if not args.log_it:
-                # We normalize the x-axis of tensorboard to num samples!
-                tot_n_samples *= train_loader.batch_size
+                    for metric_name, value in s.items():
+                        writer.add_scalar(f"test/{bname}/{metric_name}", value, step=tot_n_samples)
+                    for fig_name, fig in f.items():
+                        writer.add_figure(f"figures/{bname}/{fig_name}", fig, step=tot_n_samples)
 
-            model.train()
-            optimizer.zero_grad()
+                    str_results = [f"{k} {v:.3E}" for k, v in s.items() if isinstance(v, float)]
+                    if rank == 0:
+                        logger.info(f'[Test {bname}] {{{", ".join(str_results)}}}')
 
-            with autocast(enabled=args.mixed_precision is not None, dtype=mp_dtype):
-                data = batch_to_device(data, device, non_blocking=False)
-                pred = model(data)
-                losses, metrics = loss_fn(pred, data, epoch, conf.train.epochs)
-                loss = torch.mean(losses["total"])
+            # set the seed
+            set_seed(conf.train.seed + epoch)
 
-            # Skip the iteration if any rank encountered a NaN
-            if loss_has_nan(loss, distributed=args.distributed):
-                logger.warning(f"Skipping iteration {it} due to NaN (rank {rank})")
-                del pred, data, loss, losses, metrics
-                torch.cuda.empty_cache()
-                continue
+            # update learning rate
+            if conf.train.lr_schedule.on_epoch and epoch > 0:
+                old_lr = optimizer.param_groups[0]["lr"]
+                lr_scheduler.step(epoch)
+                logger.info(f'lr changed from {old_lr} to {optimizer.param_groups[0]["lr"]}')
 
-            do_backward = loss.requires_grad
             if args.distributed:
-                do_backward = torch.tensor(do_backward).float().to(device)
-                torch.distributed.all_reduce(do_backward, torch.distributed.ReduceOp.PRODUCT)
-                do_backward = do_backward > 0
-
-            if do_backward:
-                scaler.scale(loss).backward()
-                if args.detect_anomaly:
-                    # Check for params without any gradient which causes
-                    # problems in distributed training with checkpointing
-                    detected_anomaly = False
-                    for name, param in model.named_parameters():
-                        if param.grad is None and param.requires_grad:
-                            logger.warning(f"param {name} has no gradient.")
-                            detected_anomaly = True
-                    if detected_anomaly:
-                        raise RuntimeError("Detected anomaly in training.")
-
-                if conf.train.get("clip_grad", None):
-                    scaler.unscale_(optimizer)
-                    try:
-                        torch.nn.utils.clip_grad_norm_(
-                            all_params,
-                            max_norm=conf.train.clip_grad,
-                            error_if_nonfinite=True,
+                train_loader.sampler.set_epoch(epoch)
+            if epoch > 0 and conf.train.dataset_callback_fn and not args.overfit:
+                loaders = [train_loader]
+                if conf.train.dataset_callback_on_val:
+                    loaders += [val_loader]
+                for loader in loaders:
+                    if isinstance(loader.dataset, torch.utils.data.Subset):
+                        getattr(loader.dataset.dataset, conf.train.dataset_callback_fn)(
+                            conf.train.seed + epoch
                         )
+                    else:
+                        getattr(loader.dataset, conf.train.dataset_callback_fn)(conf.train.seed + epoch)
+            for it, data in enumerate(train_loader):
+                # logger.info(f"Starting iteration {it} - epoch {epoch} - rank {rank}")
+                tot_it = (len(train_loader) * epoch + it) * (args.n_gpus if args.distributed else 1)
+                tot_n_samples = tot_it
+                if not args.log_it:
+                    # We normalize the x-axis of tensorboard to num samples!
+                    tot_n_samples *= train_loader.batch_size
+
+                model.train()
+                optimizer.zero_grad()
+
+                with autocast(enabled=args.mixed_precision is not None, dtype=mp_dtype):
+                    data = batch_to_device(data, device, non_blocking=False)
+                    pred = model(data)
+                    losses, metrics = loss_fn(pred, data, epoch, conf.train.epochs)
+                    loss = torch.mean(losses["total"])
+
+                # Skip the iteration if any rank encountered a NaN
+                if loss_has_nan(loss, distributed=args.distributed):
+                    logger.warning(f"Skipping iteration {it} due to NaN (rank {rank})")
+                    del pred, data, loss, losses, metrics
+                    torch.cuda.empty_cache()
+                    continue
+
+                do_backward = loss.requires_grad
+                if args.distributed:
+                    do_backward = torch.tensor(do_backward).float().to(device)
+                    torch.distributed.all_reduce(do_backward, torch.distributed.ReduceOp.PRODUCT)
+                    do_backward = do_backward > 0
+
+                if do_backward:
+                    scaler.scale(loss).backward()
+                    if args.detect_anomaly:
+                        # Check for params without any gradient which causes
+                        # problems in distributed training with checkpointing
+                        detected_anomaly = False
+                        for name, param in model.named_parameters():
+                            if param.grad is None and param.requires_grad:
+                                logger.warning(f"param {name} has no gradient.")
+                                detected_anomaly = True
+                        if detected_anomaly:
+                            raise RuntimeError("Detected anomaly in training.")
+
+                    if conf.train.get("clip_grad", None):
+                        scaler.unscale_(optimizer)
+                        try:
+                            torch.nn.utils.clip_grad_norm_(
+                                all_params,
+                                max_norm=conf.train.clip_grad,
+                                error_if_nonfinite=True,
+                            )
+                            scaler.step(optimizer)
+                        except RuntimeError:
+                            logger.warning("NaN detected in gradient clipping. Skipping iteration.")
+                        scaler.update()
+                    else:
                         scaler.step(optimizer)
-                    except RuntimeError:
-                        logger.warning("NaN detected in gradient clipping. Skipping iteration.")
-                    scaler.update()
+                        scaler.update()
+
+                    if not conf.train.lr_schedule.on_epoch:
+                        [lr_scheduler.step() for _ in range(args.n_gpus if args.distributed else 1)]
                 else:
-                    scaler.step(optimizer)
-                    scaler.update()
+                    if rank == 0:
+                        logger.warning(f"Skip iteration {it} due to detach/nan. (rank {rank})")
 
-                if not conf.train.lr_schedule.on_epoch:
-                    [lr_scheduler.step() for _ in range(args.n_gpus if args.distributed else 1)]
-            else:
-                if rank == 0:
-                    logger.warning(f"Skip iteration {it} due to detach/nan. (rank {rank})")
+                if args.profile:
+                    prof.step()
 
-            if args.profile:
-                prof.step()
-
-            if it % conf.train.log_every_iter == 0:
-                train_results = metrics | losses
-                for k in sorted(train_results.keys()):
-                    if args.distributed:
-                        train_results[k] = train_results[k].sum(-1)
-                        torch.distributed.reduce(train_results[k], dst=0)
-                        train_results[k] /= train_loader.batch_size * args.n_gpus
-                    train_results[k] = torch.mean(train_results[k], -1)
-                    train_results[k] = train_results[k].item()
-                if rank == 0:
-                    str_losses = [f"{k} {v:.3E}" for k, v in train_results.items()]
-                    logger.info(
-                        "[E {} | it {}] loss {{{}}}".format(epoch, it, ", ".join(str_losses))
-                    )
-                    for k, v in train_results.items():
-                        writer.add_scalar("training/" + k, v, tot_n_samples)
-
-                    writer.add_scalar("training/lr", optimizer.param_groups[0]["lr"], tot_n_samples)
-                    writer.add_scalar("training/epoch", epoch, tot_n_samples)
-
-            if (
-                conf.train.log_grad_every_iter is not None
-                and it % conf.train.log_grad_every_iter == 0
-            ):
-                grad_txt = ""
-                for name, param in model.named_parameters():
-                    if param.grad is not None and param.requires_grad:
-                        if name.endswith("bias"):
-                            continue
-                        writer.add_histogram(f"grad/{name}", param.grad.detach(), tot_n_samples)
-                        norm = torch.norm(param.grad.detach(), 2)
-                        grad_txt += f"{name} {norm.item():.3f}  \n"
-                writer.add_text(f"grad/summary", grad_txt, tot_n_samples)
-            del pred, data, loss, losses
-
-            # Run validation
-            if (
-                (it % conf.train.eval_every_iter == 0 and (it > 0 or epoch == -int(args.no_eval_0)))
-                or stop
-                or it == (len(train_loader) - 1)
-            ):
-                with fork_rng(seed=conf.train.seed):
-                    results, pr_metrics, figures = do_evaluation(
-                        model,
-                        val_loader,
-                        device,
-                        loss_fn,
-                        conf.train,
-                        pbar=(rank == -1),
-                    )
-
-                if rank == 0:
-                    str_results = [
-                        f"{k} {v:.3E}" for k, v in results.items() if isinstance(v, float)
-                    ]
-                    logger.info(f'[Validation] {{{", ".join(str_results)}}}')
-                    for k, v in results.items():
-                        if isinstance(v, dict):
-                            writer.add_scalars(f"figure/val/{k}", v, tot_n_samples)
-                        else:
-                            writer.add_scalar("val/" + k, v, tot_n_samples)
-                    for k, v in pr_metrics.items():
-                        writer.add_pr_curve("val/" + k, *v, tot_n_samples)
-                    # @TODO: optional always save checkpoint
-                    if results[conf.train.best_key] < best_eval:
-                        best_eval = results[conf.train.best_key]
-                        save_experiment(
-                            model,
-                            optimizer,
-                            lr_scheduler,
-                            conf,
-                            losses_,
-                            results,
-                            best_eval,
-                            epoch,
-                            tot_it,
-                            output_dir,
-                            stop,
-                            args.distributed,
-                            cp_name="checkpoint_best.tar",
+                if it % conf.train.log_every_iter == 0:
+                    train_results = metrics | losses
+                    for k in sorted(train_results.keys()):
+                        if args.distributed:
+                            train_results[k] = train_results[k].sum(-1)
+                            torch.distributed.reduce(train_results[k], dst=0)
+                            train_results[k] /= train_loader.batch_size * args.n_gpus
+                        train_results[k] = torch.mean(train_results[k], -1)
+                        train_results[k] = train_results[k].item()
+                    if rank == 0:
+                        str_losses = [f"{k} {v:.3E}" for k, v in train_results.items()]
+                        logger.info(
+                            "[E {} | it {}] loss {{{}}}".format(epoch, it, ", ".join(str_losses))
                         )
-                        logger.info(f"New best val: {conf.train.best_key}={best_eval}")
-                    if len(figures) > 0:
-                        for i, figs in enumerate(figures):
-                            for name, fig in figs.items():
-                                writer.add_figure(f"figures/{i}_{name}", fig, tot_n_samples)
-                torch.cuda.empty_cache()  # should be cleared at the first iter
+                        for k, v in train_results.items():
+                            writer.add_scalar("training/" + k, v, tot_n_samples)
 
-            if (tot_it % conf.train.save_every_iter == 0 and tot_it > 0) and rank == 0:
-                if results is None:
-                    results, _, _ = do_evaluation(
+                        writer.add_scalar("training/lr", optimizer.param_groups[0]["lr"], tot_n_samples)
+                        writer.add_scalar("training/epoch", epoch, tot_n_samples)
+
+                if (
+                        conf.train.log_grad_every_iter is not None
+                        and it % conf.train.log_grad_every_iter == 0
+                ):
+                    grad_txt = ""
+                    for name, param in model.named_parameters():
+                        if param.grad is not None and param.requires_grad:
+                            if name.endswith("bias"):
+                                continue
+                            writer.add_histogram(f"grad/{name}", param.grad.detach(), tot_n_samples)
+                            norm = torch.norm(param.grad.detach(), 2)
+                            grad_txt += f"{name} {norm.item():.3f}  \n"
+                    writer.add_text(f"grad/summary", grad_txt, tot_n_samples)
+                del pred, data, loss, losses
+
+                # Run validation
+                if (
+                        (it % conf.train.eval_every_iter == 0 and (it > 0 or epoch == -int(args.no_eval_0)))
+                        or stop
+                        or it == (len(train_loader) - 1)
+                ):
+                    with fork_rng(seed=conf.train.seed):
+                        results, pr_metrics, figures = do_evaluation(
+                            model,
+                            val_loader,
+                            device,
+                            loss_fn,
+                            conf.train,
+                            pbar=(rank == -1),
+                        )
+
+                    if rank == 0:
+                        str_results = [
+                            f"{k} {v:.3E}" for k, v in results.items() if isinstance(v, float)
+                        ]
+                        logger.info(f'[Validation] {{{", ".join(str_results)}}}')
+                        for k, v in results.items():
+                            if isinstance(v, dict):
+                                writer.add_scalars(f"figure/val/{k}", v, tot_n_samples)
+                            else:
+                                writer.add_scalar("val/" + k, v, tot_n_samples)
+                        for k, v in pr_metrics.items():
+                            writer.add_pr_curve("val/" + k, *v, tot_n_samples)
+                        # @TODO: optional always save checkpoint
+                        if results[conf.train.best_key] < best_eval:
+                            best_eval = results[conf.train.best_key]
+                            save_experiment(
+                                model,
+                                optimizer,
+                                lr_scheduler,
+                                conf,
+                                losses_,
+                                results,
+                                best_eval,
+                                epoch,
+                                tot_it,
+                                output_dir,
+                                stop,
+                                args.distributed,
+                                cp_name="checkpoint_best.tar",
+                            )
+                            logger.info(f"New best val: {conf.train.best_key}={best_eval}")
+                        if len(figures) > 0:
+                            for i, figs in enumerate(figures):
+                                for name, fig in figs.items():
+                                    writer.add_figure(f"figures/{i}_{name}", fig, tot_n_samples)
+                    torch.cuda.empty_cache()  # should be cleared at the first iter
+
+                if (tot_it % conf.train.save_every_iter == 0 and tot_it > 0) and rank == 0:
+                    if results is None:
+                        results, _, _ = do_evaluation(
+                            model,
+                            val_loader,
+                            device,
+                            loss_fn,
+                            conf.train,
+                            pbar=(rank == -1),
+                        )
+                        best_eval = results[conf.train.best_key]
+                    best_eval = save_experiment(
                         model,
-                        val_loader,
-                        device,
-                        loss_fn,
-                        conf.train,
-                        pbar=(rank == -1),
+                        optimizer,
+                        lr_scheduler,
+                        conf,
+                        losses_,
+                        results,
+                        best_eval,
+                        epoch,
+                        tot_it,
+                        output_dir,
+                        stop,
+                        args.distributed,
                     )
-                    best_eval = results[conf.train.best_key]
+
+                if stop:
+                    break
+
+            if rank == 0:
                 best_eval = save_experiment(
                     model,
                     optimizer,
@@ -639,31 +659,12 @@ def training(rank, conf, output_dir, args):
                     best_eval,
                     epoch,
                     tot_it,
-                    output_dir,
-                    stop,
-                    args.distributed,
+                    output_dir=output_dir,
+                    stop=stop,
+                    distributed=args.distributed,
                 )
 
-            if stop:
-                break
-
-        if rank == 0:
-            best_eval = save_experiment(
-                model,
-                optimizer,
-                lr_scheduler,
-                conf,
-                losses_,
-                results,
-                best_eval,
-                epoch,
-                tot_it,
-                output_dir=output_dir,
-                stop=stop,
-                distributed=args.distributed,
-            )
-
-        epoch += 1
+            epoch += 1
 
     logger.info(f"Finished training on process {rank}.")
     if rank == 0:
