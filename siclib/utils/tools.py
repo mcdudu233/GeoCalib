@@ -300,11 +300,15 @@ def fork_rng(seed=None, with_cuda=True):
         set_random_state(state)
 
 
-def get_device(num=0) -> str:
-    # num 是指定的设备号
-    device = "cpu:" + str(num)
-    if torch.cuda.is_available():
-        device = "cuda:" + str(num)
-    elif torch.backends.mps.is_available():
-        device = "mps:" + str(num)
-    return device
+def get_device(name=0) -> str:
+    if isinstance(name, int) or (isinstance(name, str) and name.isdigit()):
+        # num 是指定的设备号
+        num = name
+        device = "cpu:" + str(num)
+        if torch.cuda.is_available():
+            device = "cuda:" + str(num)
+        elif torch.backends.mps.is_available():
+            device = "mps:" + str(num)
+        return device
+    else:
+        return str(name)

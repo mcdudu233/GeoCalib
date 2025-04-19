@@ -99,7 +99,7 @@ def get_eval_parser():
     parser.add_argument("--tag", type=str, default=None)
     parser.add_argument("--checkpoint", type=str, default=None)
     parser.add_argument("--conf", type=str, default=None)
-    parser.add_argument("--device", type=int, default=0)
+    parser.add_argument("--device", type=str, default=0)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--overwrite_eval", action="store_true")
     parser.add_argument("--plot", action="store_true")

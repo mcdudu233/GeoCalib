@@ -405,7 +405,7 @@ def training(rank, conf, output_dir, args):
         conf.train.epochs = conf.train.epochs // (args.n_gpus if args.distributed else 1)
         logger.info(f"Setting epochs to {conf.train.epochs} to match num_steps.")
 
-    with torch.cuda.device(device):
+    with torch.device(device):
         while epoch < conf.train.epochs and not stop:
             tot_it = (len(train_loader) * epoch) * (args.n_gpus if args.distributed else 1)
             tot_n_samples = tot_it * train_loader.batch_size
@@ -706,7 +706,7 @@ if __name__ == "__main__":
         type=str,
         choices=["default", "reduce-overhead", "max-autotune"],
     )
-    parser.add_argument("--device", default=0, type=int)
+    parser.add_argument("--device", default=0, type=str)
     parser.add_argument("--overfit", action="store_true")
     parser.add_argument("--restore", action="store_true")
     parser.add_argument("--distributed", action="store_true")
