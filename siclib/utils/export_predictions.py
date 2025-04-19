@@ -31,6 +31,7 @@ def export_predictions(
     callback_fn=None,
     optional_keys=None,
     verbose=True,
+    device=0,
 ):  # sourcery skip: low-code-quality
     if optional_keys is None:
         optional_keys = []
@@ -38,7 +39,7 @@ def export_predictions(
     assert keys == "*" or isinstance(keys, (tuple, list))
     Path(output_file).parent.mkdir(exist_ok=True, parents=True)
     hfile = h5py.File(str(output_file), "w")
-    device = get_device()
+    device = get_device(device)
     model = model.to(device).eval()
 
     if not verbose:

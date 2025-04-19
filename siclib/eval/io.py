@@ -59,6 +59,7 @@ def parse_eval_args(benchmark, args, configs_path, default=None):
     cli_conf = OmegaConf.from_cli(args.dotlist)
     conf = OmegaConf.merge(conf, cli_conf)
     conf.checkpoint = args.checkpoint or conf.get("checkpoint")
+    conf.device = args.device
 
     if conf.checkpoint and not conf.checkpoint.endswith(".tar"):
         checkpoint_conf = OmegaConf.load(TRAINING_PATH / conf.checkpoint / "config.yaml")
@@ -98,6 +99,7 @@ def get_eval_parser():
     parser.add_argument("--tag", type=str, default=None)
     parser.add_argument("--checkpoint", type=str, default=None)
     parser.add_argument("--conf", type=str, default=None)
+    parser.add_argument("--device", type=int, default=0)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--overwrite_eval", action="store_true")
     parser.add_argument("--plot", action="store_true")

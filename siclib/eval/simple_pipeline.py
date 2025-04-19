@@ -145,6 +145,7 @@ def compute_gravity_metrics(gravity_pred: Gravity, gravity_gt: Gravity) -> Dict[
 
 class SimplePipeline(EvalPipeline):
     default_conf = {
+        "device": 0,
         "data": {},
         "model": {},
         "eval": {
@@ -206,6 +207,7 @@ class SimplePipeline(EvalPipeline):
                 self.get_dataloader(self.conf.data),
                 model,
                 pred_file,
+                device=self.conf.device,
                 keys=self.export_keys,
                 optional_keys=self.optional_export_keys,
                 verbose=self.verbose,
