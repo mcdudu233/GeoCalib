@@ -45,41 +45,42 @@ def export_predictions(
     if not verbose:
         logger.info(f"Exporting predictions to {output_file}")
 
-    for data_ in tqdm(loader, desc="Exporting", total=len(loader), ncols=80, disable=not verbose):
-        data = batch_to_device(data_, device, non_blocking=True)
-        pred = model(data)
-        if callback_fn is not None:
-            pred = {**callback_fn(pred, data), **pred}
-        if keys != "*":
-            if len(set(keys) - set(pred.keys())) > 0:
-                raise ValueError(f"Missing key {set(keys) - set(pred.keys())}")
-            pred = {k: v for k, v in pred.items() if k in keys + optional_keys}
+    with torch.cuda.device(device):
+        for data_ in tqdm(loader, desc="Exporting", total=len(loader), ncols=80, disable=not verbose):
+            data = batch_to_device(data_, device, non_blocking=True)
+            pred = model(data)
+            if callback_fn is not None:
+                pred = {**callback_fn(pred, data), **pred}
+            if keys != "*":
+                if len(set(keys) - set(pred.keys())) > 0:
+                    raise ValueError(f"Missing key {set(keys) - set(pred.keys())}")
+                pred = {k: v for k, v in pred.items() if k in keys + optional_keys}
 
-        # assert len(pred) > 0, "No predictions found"
+            # assert len(pred) > 0, "No predictions found"
 
-        for idx in range(len(data["name"])):
-            pred_ = {k: v[idx].cpu().numpy() for k, v in pred.items()}
+            for idx in range(len(data["name"])):
+                pred_ = {k: v[idx].cpu().numpy() for k, v in pred.items()}
 
-            if as_half:
-                for k in pred_:
-                    dt = pred_[k].dtype
-                    if (dt == np.float32) and (dt != np.float16):
-                        pred_[k] = pred_[k].astype(np.float16)
-            try:
-                name = data["name"][idx]
+                if as_half:
+                    for k in pred_:
+                        dt = pred_[k].dtype
+                        if (dt == np.float32) and (dt != np.float16):
+                            pred_[k] = pred_[k].astype(np.float16)
                 try:
-                    grp = hfile.create_group(name)
-                except ValueError as e:
-                    raise ValueError(f"Group already exists {name}") from e
+                    name = data["name"][idx]
+                    try:
+                        grp = hfile.create_group(name)
+                    except ValueError as e:
+                        raise ValueError(f"Group already exists {name}") from e
 
-                # grp = hfile.create_group(name)
-                for k, v in pred_.items():
-                    grp.create_dataset(k, data=v)
-            except RuntimeError:
-                print(f"Failed to export {name}")
-                continue
+                    # grp = hfile.create_group(name)
+                    for k, v in pred_.items():
+                        grp.create_dataset(k, data=v)
+                except RuntimeError:
+                    print(f"Failed to export {name}")
+                    continue
 
-        del pred
+            del pred
 
     hfile.close()
     return output_file
