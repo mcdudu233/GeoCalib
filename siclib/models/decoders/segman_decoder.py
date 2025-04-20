@@ -523,7 +523,6 @@ class SegMANDecoder(BaseModel):
         "out_channels": 64,
         "in_index": [0, 1, 2, 3],
         "feat_proj_dim": 288,
-        "dropout_ratio": 0.1,
         "short_cut": False,
         "interpolate_mode": 'bilinear',
         "with_low_level": True,
@@ -573,6 +572,11 @@ class SegMANDecoder(BaseModel):
             feature_resample=self.feature_resample, feature_resample_group=self.feature_resample_group,
             hamming_window=False, compressed_channels=(self.feat_proj_dim * 2) // conf.compress_ratio
         )
+        self.freqfusion_c2 = FreqFusion(
+            hr_channels=self.feat_proj_dim, lr_channels=self.feat_proj_dim,
+            feature_resample=self.feature_resample, feature_resample_group=self.feature_resample_group,
+            hamming_window=False, compressed_channels=(self.feat_proj_dim * 2) // conf.compress_ratio
+        )
 
         self.linear_fuse = ConvModule(
                         in_channels=self.feat_proj_dim*3,
@@ -614,13 +618,6 @@ class SegMANDecoder(BaseModel):
 
         self.interpolate_mode = conf.interpolate_mode
 
-        self.conv_seg = nn.Conv2d(self.embed_dim, self.out_channels, kernel_size=1)
-        self.dropout_ratio = conf.dropout_ratio
-        if self.dropout_ratio > 0:
-            self.dropout = nn.Dropout2d(self.dropout_ratio)
-        else:
-            self.dropout = None
-
         if self.predict_uncertainty:
             self.linear_pred_uncertainty = nn.Sequential(
                 ConvModule(
@@ -653,12 +650,15 @@ class SegMANDecoder(BaseModel):
         _c3 = self.linear_c3(c3)
         _c2 = self.linear_c2(c2)
 
-        _c4 = resize(_c4, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
-        _c3 = resize(_c3, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
-        # TODO: 采用融合块
-        # _, _c3, _c4 = self.freqfusion_c4(hr_feat=_c3, lr_feat=_c4)
-        # _, _c2, _c4 = self.freqfusion_c4(hr_feat=_c2, lr_feat=_c4)
-        # _, _c2, _c3 = self.freqfusion_c3(hr_feat=_c2, lr_feat=_c3)
+        # _c4 = resize(_c4, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
+        # _c3 = resize(_c3, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
+        # 采用融合块
+        # c4: 10x10 -> 20x20
+        _, _c3, _c4 = self.freqfusion_c4(hr_feat=_c3, lr_feat=_c4)
+        # c3: 20x20 -> 40x40
+        _, _c2, _c3 = self.freqfusion_c3(hr_feat=_c2, lr_feat=_c3)
+        # c4: 20x20 -> 40x40
+        _, _c2, _c4 = self.freqfusion_c2(hr_feat=_c2, lr_feat=_c4)
 
         _c = self.linear_fuse(torch.cat([_c4, _c3, _c2], dim=1))
 
@@ -700,10 +700,18 @@ class SegMANDecoder(BaseModel):
         c2 = c2 + _out_
         c3 = c3 + _out_
         c4 = c4 + _out_
- 
+        print("_out_", _out.shape)
+        print("c2", c2.shape)
+        print("c3", c3.shape)
+        print("c4", c4.shape)
+
         out += [_out, c2,c3,c4]
 
-        out = self.cat(torch.cat(out, dim=1))
+        out = torch.cat(out, dim=1)
+        print("out", out.shape)
+
+        out = self.cat(out)
+        print("out", out.shape)
 
         return out
 
@@ -713,11 +721,7 @@ class SegMANDecoder(BaseModel):
 
         x, c2, c3, c4 = self.forward_mlp_decoder(x)
 
-        x = self.forward_winssm(x, c2, c3, c4)
-
-        if self.dropout is not None:
-            feats = self.dropout(x)
-        feats = self.conv_seg(feats)
+        feats = self.forward_winssm(x, c2, c3, c4)
 
         if self.with_ll:
             assert "ll" in features, "Low-level features are required for this model"
