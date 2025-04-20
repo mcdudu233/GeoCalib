@@ -286,8 +286,7 @@ class DatasetGenerator:
             n_pixels = perspective_image.shape[-2] * perspective_image.shape[-1]
             valid = (torch.sum(perspective_image.sum(0) == 0) / n_pixels) < 0.01
             if not valid:
-                logger.debug(f"Perspective {perspective_name} has too many black pixels.")
-                continue
+                logger.info(f"Perspective {perspective_name} has too many black pixels.")
 
             write_image(perspective_image, out_dir / perspective_name)
 
