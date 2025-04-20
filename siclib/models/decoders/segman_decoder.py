@@ -612,7 +612,7 @@ class SegMANDecoder(BaseModel):
 
         feat_concat_dim = self.embed_dim*(2+ 3) + self.feat_proj_dim*3
         self.cat = ConvModule(in_channels=feat_concat_dim,
-                                out_channels=self.embed_dim,
+                                out_channels=self.out_channels,
                                 kernel_size=1,
                                 norm_cfg=dict(type='SyncBN', requires_grad=True)) 
 
@@ -637,9 +637,9 @@ class SegMANDecoder(BaseModel):
             self.out_conv2 = ConvModule(
                 self.out_channels, self.out_channels, 3, padding=1, bias=False
             )
-            self.out_freqfusion = FreqFusion(
-                hr_channels=self.out_channels, lr_channels=self.out_channels
-            )
+            # self.out_freqfusion = FreqFusion(
+            #     hr_channels=self.out_channels, lr_channels=self.out_channels
+            # )
             self.ll_fusion = FeatureFusionBlock(self.out_channels, upsample=False)
 
 
@@ -700,18 +700,12 @@ class SegMANDecoder(BaseModel):
         c2 = c2 + _out_
         c3 = c3 + _out_
         c4 = c4 + _out_
-        print("_out_", _out.shape)
-        print("c2", c2.shape)
-        print("c3", c3.shape)
-        print("c4", c4.shape)
 
         out += [_out, c2,c3,c4]
 
         out = torch.cat(out, dim=1)
-        print("out", out.shape)
 
         out = self.cat(out)
-        print("out", out.shape)
 
         return out
 
@@ -733,8 +727,9 @@ class SegMANDecoder(BaseModel):
             feats = self.out_conv2(feats)
             # [b,64,160,160]
             feats_ll = features["ll"].clone()
-            # 使用融合方法扩大
-            _, feats_ll, feats = self.out_freqfusion(hr_feat=feats_ll, lr_feat=feats)
+            feats = F.interpolate(feats, scale_factor=2, mode="bilinear", align_corners=False)
+            # TODO: 使用融合方法扩大
+            # _, feats_ll, feats = self.out_freqfusion(hr_feat=feats_ll, lr_feat=feats)
             feats = self.ll_fusion(feats, feats_ll)
 
         uncertainty = (
