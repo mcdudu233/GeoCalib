@@ -284,9 +284,10 @@ class DatasetGenerator:
             perspective_name = f"{pano_path.stem}_{i}.jpg"
 
             n_pixels = perspective_image.shape[-2] * perspective_image.shape[-1]
-            valid = (torch.sum(perspective_image.sum(0) == 0) / n_pixels) < 0.01
+            valid_sum = (torch.sum(perspective_image.sum(0) == 0) / n_pixels)
+            valid = valid_sum < 0.01
             if not valid:
-                logger.info(f"Perspective {perspective_name} has too many black pixels.")
+                logger.info(f"Perspective {perspective_name} has too many ({valid_sum * 100}%) black pixels.")
 
             write_image(perspective_image, out_dir / perspective_name)
 
