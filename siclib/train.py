@@ -405,7 +405,7 @@ def training(rank, conf, output_dir, args):
         conf.train.epochs = conf.train.epochs // (args.n_gpus if args.distributed else 1)
         logger.info(f"Setting epochs to {conf.train.epochs} to match num_steps.")
 
-    with torch.device(device):
+    with torch.cuda.device(device):
         while epoch < conf.train.epochs and not stop:
             tot_it = (len(train_loader) * epoch) * (args.n_gpus if args.distributed else 1)
             tot_n_samples = tot_it * train_loader.batch_size
