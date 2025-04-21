@@ -18,7 +18,7 @@ from timm.models.layers import DropPath, to_2tuple
 from siclib.models.utils.csm_triton import CrossScanTriton, CrossMergeTriton
 import selective_scan_cuda_oflex
 
-from siclib.models.utils.modules import FeatureFusionBlock, FreqFusion
+from siclib.models.utils.modules import FeatureFusionBlock, FreqFusion, FeatureFusionUpsampleBlock, DySample
 
 
 #################################################################################
@@ -631,16 +631,12 @@ class SegMANDecoder(BaseModel):
             )
 
         if self.with_ll:
-            self.out_conv1 = ConvModule(
+            self.dysample1 = DySample(in_channels=self.out_channels, scale=2)
+            self.dysample2 = DySample(in_channels=self.out_channels, scale=2)
+            self.out_conv = ConvModule(
                 self.out_channels, self.out_channels, 3, padding=1, bias=False
             )
-            self.out_conv2 = ConvModule(
-                self.out_channels, self.out_channels, 3, padding=1, bias=False
-            )
-            # self.out_freqfusion = FreqFusion(
-            #     hr_channels=self.out_channels, lr_channels=self.out_channels
-            # )
-            self.ll_fusion = FeatureFusionBlock(self.out_channels, upsample=False)
+            self.ll_fusion = FeatureFusionUpsampleBlock(self.out_channels, upsample=False)
 
 
     def forward_mlp_decoder(self, inputs):
@@ -650,15 +646,15 @@ class SegMANDecoder(BaseModel):
         _c3 = self.linear_c3(c3)
         _c2 = self.linear_c2(c2)
 
-        # _c4 = resize(_c4, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
-        # _c3 = resize(_c3, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
-        # 采用融合块
-        # c4: 10x10 -> 20x20
-        _, _c3, _c4 = self.freqfusion_c4(hr_feat=_c3, lr_feat=_c4)
-        # c3: 20x20 -> 40x40
-        _, _c2, _c3 = self.freqfusion_c3(hr_feat=_c2, lr_feat=_c3)
-        # c4: 20x20 -> 40x40
-        _, _c2, _c4 = self.freqfusion_c2(hr_feat=_c2, lr_feat=_c4)
+        _c4 = resize(_c4, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
+        _c3 = resize(_c3, size=inputs[1].size()[2:], mode='bilinear', align_corners=False).contiguous()
+        # TODO: 采用融合块
+        # # c4: 10x10 -> 20x20
+        # _, _c3, _c4 = self.freqfusion_c4(hr_feat=_c3, lr_feat=_c4)
+        # # c3: 20x20 -> 40x40
+        # _, _c2, _c3 = self.freqfusion_c3(hr_feat=_c2, lr_feat=_c3)
+        # # c4: 20x20 -> 40x40
+        # _, _c2, _c4 = self.freqfusion_c2(hr_feat=_c2, lr_feat=_c4)
 
         _c = self.linear_fuse(torch.cat([_c4, _c3, _c2], dim=1))
 
@@ -703,6 +699,7 @@ class SegMANDecoder(BaseModel):
 
         out += [_out, c2,c3,c4]
 
+        # [batch,1584,40,40]
         out = torch.cat(out, dim=1)
 
         out = self.cat(out)
@@ -719,17 +716,11 @@ class SegMANDecoder(BaseModel):
 
         if self.with_ll:
             assert "ll" in features, "Low-level features are required for this model"
-            # [b,64,40,40]
-            feats = F.interpolate(feats, scale_factor=2, mode="bilinear", align_corners=False)
-            feats = self.out_conv1(feats)
-            # [b,64,80,80]
-            feats = F.interpolate(feats, scale_factor=2, mode="bilinear", align_corners=False)
-            feats = self.out_conv2(feats)
-            # [b,64,160,160]
+            # [b,64,40,40] -> [b,64,80,80]
+            feats = self.out_conv(self.dysample1(feats))
+            # [b,64,80,80] -> [b,64,160,160]
+            feats = self.dysample2(feats)
             feats_ll = features["ll"].clone()
-            feats = F.interpolate(feats, scale_factor=2, mode="bilinear", align_corners=False)
-            # TODO: 使用融合方法扩大
-            # _, feats_ll, feats = self.out_freqfusion(hr_feat=feats_ll, lr_feat=feats)
             feats = self.ll_fusion(feats, feats_ll)
 
         uncertainty = (
