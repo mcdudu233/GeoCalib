@@ -562,21 +562,21 @@ class SegMANDecoder(BaseModel):
 
         self.feature_resample = conf.feature_resample
         self.feature_resample_group = conf.feature_resample_group
-        self.freqfusion_c4 = FreqFusion(
-            hr_channels=self.feat_proj_dim, lr_channels=self.feat_proj_dim,
-            feature_resample=self.feature_resample, feature_resample_group=self.feature_resample_group,
-            hamming_window=False, compressed_channels=(self.feat_proj_dim * 2) // conf.compress_ratio
-        )
-        self.freqfusion_c3 = FreqFusion(
-            hr_channels=self.feat_proj_dim, lr_channels=self.feat_proj_dim,
-            feature_resample=self.feature_resample, feature_resample_group=self.feature_resample_group,
-            hamming_window=False, compressed_channels=(self.feat_proj_dim * 2) // conf.compress_ratio
-        )
-        self.freqfusion_c2 = FreqFusion(
-            hr_channels=self.feat_proj_dim, lr_channels=self.feat_proj_dim,
-            feature_resample=self.feature_resample, feature_resample_group=self.feature_resample_group,
-            hamming_window=False, compressed_channels=(self.feat_proj_dim * 2) // conf.compress_ratio
-        )
+        # self.freqfusion_c4 = FreqFusion(
+        #     hr_channels=self.feat_proj_dim, lr_channels=self.feat_proj_dim,
+        #     feature_resample=self.feature_resample, feature_resample_group=self.feature_resample_group,
+        #     hamming_window=False, compressed_channels=(self.feat_proj_dim * 2) // conf.compress_ratio
+        # )
+        # self.freqfusion_c3 = FreqFusion(
+        #     hr_channels=self.feat_proj_dim, lr_channels=self.feat_proj_dim,
+        #     feature_resample=self.feature_resample, feature_resample_group=self.feature_resample_group,
+        #     hamming_window=False, compressed_channels=(self.feat_proj_dim * 2) // conf.compress_ratio
+        # )
+        # self.freqfusion_c2 = FreqFusion(
+        #     hr_channels=self.feat_proj_dim, lr_channels=self.feat_proj_dim,
+        #     feature_resample=self.feature_resample, feature_resample_group=self.feature_resample_group,
+        #     hamming_window=False, compressed_channels=(self.feat_proj_dim * 2) // conf.compress_ratio
+        # )
 
         self.linear_fuse = ConvModule(
                         in_channels=self.feat_proj_dim*3,
@@ -632,10 +632,9 @@ class SegMANDecoder(BaseModel):
 
         if self.with_ll:
             self.dysample1 = DySample(in_channels=self.out_channels, scale=2)
+            self.out_conv1 = ConvModule(self.out_channels, self.out_channels, 3, padding=1, bias=False)
             self.dysample2 = DySample(in_channels=self.out_channels, scale=2)
-            self.out_conv = ConvModule(
-                self.out_channels, self.out_channels, 3, padding=1, bias=False
-            )
+            self.out_conv2 = ConvModule(self.out_channels, self.out_channels, 3, padding=1, bias=False)
             self.ll_fusion = FeatureFusionUpsampleBlock(self.out_channels, upsample=False)
 
 
@@ -717,9 +716,9 @@ class SegMANDecoder(BaseModel):
         if self.with_ll:
             assert "ll" in features, "Low-level features are required for this model"
             # [b,64,40,40] -> [b,64,80,80]
-            feats = self.out_conv(self.dysample1(feats))
+            feats = self.out_conv1(self.dysample1(feats))
             # [b,64,80,80] -> [b,64,160,160]
-            feats = self.dysample2(feats)
+            feats = self.out_conv2(self.dysample2(feats))
             feats_ll = features["ll"].clone()
             feats = self.ll_fusion(feats, feats_ll)
 
