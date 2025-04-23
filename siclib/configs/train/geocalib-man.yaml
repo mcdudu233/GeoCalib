@@ -23,7 +23,7 @@ lr_schedule:
       - type: MultiStepLR
         options:
           gamma: 0.1
-          milestones: [80_000, 130_000]
+          milestones: [70_000, 120_000]
 
 submodules: []
 
