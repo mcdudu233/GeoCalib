@@ -48,7 +48,7 @@ def export_predictions(
     if not verbose:
         logger.info(f"Exporting predictions to {output_file}")
 
-    with torch.device(device):
+    with torch.cuda.device(device):
         for data_ in tqdm(loader, desc="Exporting", total=len(loader), ncols=80, disable=not verbose):
             data = batch_to_device(data_, device, non_blocking=True)
             pred = model(data)
