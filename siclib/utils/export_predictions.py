@@ -36,6 +36,7 @@ def export_predictions(
     if optional_keys is None:
         optional_keys = []
 
+    # 解决多线程问题
     torch.multiprocessing.set_start_method('spawn')
 
     assert keys == "*" or isinstance(keys, (tuple, list))
