@@ -36,6 +36,8 @@ def export_predictions(
     if optional_keys is None:
         optional_keys = []
 
+    torch.multiprocessing.set_start_method('spawn')
+
     assert keys == "*" or isinstance(keys, (tuple, list))
     Path(output_file).parent.mkdir(exist_ok=True, parents=True)
     hfile = h5py.File(str(output_file), "w")
