@@ -114,7 +114,8 @@ def get_lr_scheduler(optimizer, conf):
 
             options = {k: v for k, v in conf.options.items() if k != "schedulers"}
             if "lr_lambda" in options:
-                options["lr_lambda"] =lambda epoch: epoch // 2
+                print(options["lr_lambda"])
+                options["lr_lambda"] = lambda epoch: epoch // 2
             return getattr(torch.optim.lr_scheduler, conf.type)(optimizer, schedulers, **options)
 
         return getattr(torch.optim.lr_scheduler, conf.type)(optimizer, **conf.options)
