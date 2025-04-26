@@ -542,7 +542,7 @@ def training(rank, conf, output_dir, args):
                     if rank == 0:
                         str_losses = [f"{k} {v:.3E}" for k, v in train_results.items()]
                         logger.info(
-                            "[E {} | it {}] lr {{{}}} loss {{{}}}".format(epoch, it, optimizer.param_groups[0]["lr"], ", ".join(str_losses))
+                            "[E {} | it {}] loss {{{}}}".format(epoch, it, ", ".join(str_losses))
                         )
                         for k, v in train_results.items():
                             writer.add_scalar("training/" + k, v, tot_n_samples)
