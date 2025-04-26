@@ -14,8 +14,7 @@ lr_schedule:
   type: LambdaLR
   on_epoch: false
   options:
-    lr_lambda:
-      - lambda epoch: epoch // 2
+    lr_lambda: "lambda epoch: epoch // 2"
 
 submodules: []
 
