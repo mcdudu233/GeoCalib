@@ -115,7 +115,7 @@ def get_lr_scheduler(optimizer, conf):
             options = {k: v for k, v in conf.options.items() if k != "schedulers"}
             return getattr(torch.optim.lr_scheduler, conf.type)(optimizer, schedulers, **options)
 
-        return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: (epoch+1) ** 2)
+        return getattr(torch.optim.lr_scheduler, conf.type)(optimizer, **conf.options)
 
     # backward compatibility
     def lr_fn(it):  # noqa: E306
@@ -542,7 +542,7 @@ def training(rank, conf, output_dir, args):
                     if rank == 0:
                         str_losses = [f"{k} {v:.3E}" for k, v in train_results.items()]
                         logger.info(
-                            "[E {} | it {}] loss {{{}}}".format(epoch, it, ", ".join(str_losses))
+                            "[E {} | it {}] lr {{{}}} loss {{{}}}".format(epoch, it, optimizer.param_groups[0]["lr"], ", ".join(str_losses))
                         )
                         for k, v in train_results.items():
                             writer.add_scalar("training/" + k, v, tot_n_samples)
