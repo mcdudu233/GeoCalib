@@ -115,7 +115,7 @@ def get_lr_scheduler(optimizer, conf):
             options = {k: v for k, v in conf.options.items() if k != "schedulers"}
             return getattr(torch.optim.lr_scheduler, conf.type)(optimizer, schedulers, **options)
 
-        return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: (epoch+1) ** 1.85)
+        return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: (epoch+1) ** 2)
 
     # backward compatibility
     def lr_fn(it):  # noqa: E306
