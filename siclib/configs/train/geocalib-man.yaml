@@ -5,7 +5,7 @@ writer: null
 log_every_iter: 1
 eval_every_iter: 1000
 
-lr: 1e-8
+lr: 1e-9
 optimizer: adamw
 clip_grad: 1.0
 best_key: loss/param_total
