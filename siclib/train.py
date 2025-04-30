@@ -22,7 +22,7 @@ import numpy as np
 import torch
 from hydra import compose, initialize
 from omegaconf import OmegaConf
-from torch.cuda.amp import GradScaler, autocast
+from torch.amp import GradScaler, autocast
 from tqdm import tqdm
 
 from siclib import __module_name__, logger
@@ -473,7 +473,7 @@ def training(rank, conf, output_dir, args):
                 model.train()
                 optimizer.zero_grad()
 
-                with autocast(enabled=args.mixed_precision is not None, dtype=mp_dtype):
+                with autocast(device_type="cuda", enabled=args.mixed_precision is not None, dtype=mp_dtype):
                     data = batch_to_device(data, device, non_blocking=False)
                     pred = model(data)
                     losses, metrics = loss_fn(pred, data, epoch, conf.train.epochs)
