@@ -968,9 +968,9 @@ class SegMANEncoder(BaseModel):
 
 
     def _forward(self, data):
-        img = data["image"]
+        x = data["image"]
         # rgb -> bgr and from [0, 1] to [0, 255]
-        x = img[:, [2, 1, 0], :, :] * 255.0
+        # x = img[:, [2, 1, 0], :, :] * 255.0
 
         x = self.patch_embed(x)
 
