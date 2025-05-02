@@ -612,7 +612,7 @@ class SegMANDecoder(BaseModel):
 
         feat_concat_dim = self.embed_dim*(2+ 3) + self.feat_proj_dim*3
         self.cat = ConvModule(in_channels=feat_concat_dim,
-                                out_channels=self.out_channels,
+                                out_channels=self.out_channels * 4 * 4,
                                 kernel_size=1,
                                 norm_cfg=dict(type='SyncBN', requires_grad=True)) 
 
@@ -631,10 +631,6 @@ class SegMANDecoder(BaseModel):
             )
 
         if self.with_ll:
-            self.dysample1 = DySample(in_channels=self.out_channels, scale=2)
-            self.out_conv1 = ConvModule(self.out_channels, self.out_channels, 3, padding=1, bias=False)
-            self.dysample2 = DySample(in_channels=self.out_channels, scale=2)
-            self.out_conv2 = ConvModule(self.out_channels, self.out_channels, 3, padding=1, bias=False)
             self.ll_fusion = FeatureFusionUpsampleBlock(self.out_channels, upsample=False)
 
 
@@ -715,10 +711,8 @@ class SegMANDecoder(BaseModel):
 
         if self.with_ll:
             assert "ll" in features, "Low-level features are required for this model"
-            # [b,64,40,40] -> [b,64,80,80]
-            feats = self.out_conv1(self.dysample1(feats))
-            # [b,64,80,80] -> [b,64,160,160]
-            feats = self.out_conv2(self.dysample2(feats))
+            # [b,1024,40,40] -> [b,64,160,160]
+            feats = F.pixel_shuffle(feats, upscale_factor=4)
             feats_ll = features["ll"].clone()
             feats = self.ll_fusion(feats, feats_ll)
 
