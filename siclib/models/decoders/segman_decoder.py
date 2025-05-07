@@ -631,9 +631,9 @@ class SegMANDecoder(BaseModel):
             )
 
         if self.with_ll:
-            self.out_conv11 = ConvModule(self.out_channels * 4, self.out_channels * 4, 5, padding=1, bias=False)
+            self.out_conv11 = ConvModule(self.out_channels * 4, self.out_channels * 4, 5, padding=2, bias=False)
             self.out_conv12 = ConvModule(self.out_channels * 4, self.out_channels * 4, 3, padding=1, bias=False)
-            self.out_conv21 = ConvModule(self.out_channels, self.out_channels, 5, padding=1, bias=False)
+            self.out_conv21 = ConvModule(self.out_channels, self.out_channels, 5, padding=2, bias=False)
             self.out_conv22 = ConvModule(self.out_channels, self.out_channels, 3, padding=1, bias=False)
             self.ll_fusion = FeatureFusionUpsampleBlock(self.out_channels, upsample=False)
 
