@@ -631,10 +631,8 @@ class SegMANDecoder(BaseModel):
             )
 
         if self.with_ll:
-            self.out_conv11 = ConvModule(self.out_channels * 4, self.out_channels * 4, 5, padding=2, bias=False)
-            self.out_conv12 = ConvModule(self.out_channels * 4, self.out_channels * 4, 3, padding=1, bias=False)
-            self.out_conv21 = ConvModule(self.out_channels, self.out_channels, 5, padding=2, bias=False)
-            self.out_conv22 = ConvModule(self.out_channels, self.out_channels, 3, padding=1, bias=False)
+            self.out_conv1 = ConvModule(self.out_channels * 4, self.out_channels * 4, 5, padding=2, bias=False)
+            self.out_conv2 = ConvModule(self.out_channels, self.out_channels, 5, padding=2, bias=False)
             self.ll_fusion = FeatureFusionUpsampleBlock(self.out_channels, upsample=False)
 
 
@@ -717,14 +715,10 @@ class SegMANDecoder(BaseModel):
             assert "ll" in features, "Low-level features are required for this model"
             # [b,1024,40,40] -> [b,256,80,80]
             feats = F.pixel_shuffle(feats, upscale_factor=2)
-            feats = self.out_conv11(feats)
-            feats = F.relu(feats)
-            feats = self.out_conv12(feats)
+            feats = self.out_conv1(feats)
             # [b,256,80,80] -> [b,64,160,160]
             feats = F.pixel_shuffle(feats, upscale_factor=2)
-            feats = self.out_conv21(feats)
-            feats = F.relu(feats)
-            feats = self.out_conv22(feats)
+            feats = self.out_conv2(feats)
             feats_ll = features["ll"].clone()
             feats = self.ll_fusion(feats, feats_ll)
 
