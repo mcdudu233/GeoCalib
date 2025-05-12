@@ -520,11 +520,10 @@ class SegMANDecoder(BaseModel):
         "predict_uncertainty": True,
         "channels": 144,
         "in_channels": [64, 144, 288, 512],
-        "out_channels": 64,
+        "out_channels": 144,
         "in_index": [0, 1, 2, 3],
         "feat_proj_dim": 288,
         "short_cut": False,
-        "interpolate_mode": 'bilinear',
         "with_low_level": True,
         "feature_resample": False,
         "feature_resample_group": 4,
@@ -612,11 +611,9 @@ class SegMANDecoder(BaseModel):
 
         feat_concat_dim = self.embed_dim*(2+ 3) + self.feat_proj_dim*3
         self.cat = ConvModule(in_channels=feat_concat_dim,
-                                out_channels=self.out_channels * 4 * 4,
+                                out_channels=self.out_channels,
                                 kernel_size=1,
-                                norm_cfg=dict(type='SyncBN', requires_grad=True)) 
-
-        self.interpolate_mode = conf.interpolate_mode
+                                norm_cfg=dict(type='SyncBN', requires_grad=True))
 
         if self.predict_uncertainty:
             self.linear_pred_uncertainty = nn.Sequential(
@@ -631,9 +628,10 @@ class SegMANDecoder(BaseModel):
             )
 
         if self.with_ll:
-            self.out_conv1 = ConvModule(self.out_channels * 4, self.out_channels * 4, 5, padding=2, bias=False)
-            self.out_conv2 = ConvModule(self.out_channels, self.out_channels, 5, padding=2, bias=False)
-            self.ll_fusion = FeatureFusionUpsampleBlock(self.out_channels, upsample=False)
+            self.out_conv1 = ConvModule(self.out_channels, self.out_channels, 3, padding=1, bias=False)
+            self.out_conv2 = ConvModule(self.out_channels, self.out_channels, 3, padding=1, bias=False)
+            self.out_conv3 = ConvModule(self.out_channels, self.out_channels, 3, padding=1, bias=False)
+            # self.ll_fusion = FeatureFusionUpsampleBlock(self.out_channels, upsample=False)
 
 
     def forward_mlp_decoder(self, inputs):
@@ -713,14 +711,17 @@ class SegMANDecoder(BaseModel):
 
         if self.with_ll:
             assert "ll" in features, "Low-level features are required for this model"
-            # [b,1024,40,40] -> [b,256,80,80]
-            feats = F.pixel_shuffle(feats, upscale_factor=2)
+            # [b,144,40,40] -> [b,144,80,80]
+            feats = F.interpolate(feats, scale_factor=2, mode='bilinear')
             feats = self.out_conv1(feats)
-            # [b,256,80,80] -> [b,64,160,160]
-            feats = F.pixel_shuffle(feats, upscale_factor=2)
+            # [b,144,80,80] -> [b,144,160,160]
+            feats = F.interpolate(feats, scale_factor=2, mode='bilinear')
             feats = self.out_conv2(feats)
-            feats_ll = features["ll"].clone()
-            feats = self.ll_fusion(feats, feats_ll)
+            # [b,144,160,160] -> [b,144,320,320]
+            feats = F.interpolate(feats, scale_factor=2, mode='bilinear')
+            feats = self.out_conv3(feats)
+            # feats_ll = features["ll"].clone()
+            # feats = self.ll_fusion(feats, feats_ll)
 
         uncertainty = (
             self.linear_pred_uncertainty(feats).squeeze(1) if self.predict_uncertainty else None
