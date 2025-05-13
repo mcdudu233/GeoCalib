@@ -631,7 +631,7 @@ class SegMANDecoder(BaseModel):
             self.out_conv1 = ConvModule(self.out_channels, self.out_channels, 3, padding=1, bias=False)
             self.out_conv2 = ConvModule(self.out_channels, self.out_channels, 3, padding=1, bias=False)
             self.out_conv3 = ConvModule(self.out_channels, self.out_channels, 3, padding=1, bias=False)
-            # self.ll_fusion = FeatureFusionUpsampleBlock(self.out_channels, upsample=False)
+            self.ll_fusion = FeatureFusionBlock(self.out_channels, upsample=False)
 
 
     def forward_mlp_decoder(self, inputs):
@@ -720,8 +720,8 @@ class SegMANDecoder(BaseModel):
             # [b,144,160,160] -> [b,144,320,320]
             feats = F.interpolate(feats, scale_factor=2, mode='bilinear')
             feats = self.out_conv3(feats)
-            # feats_ll = features["ll"].clone()
-            # feats = self.ll_fusion(feats, feats_ll)
+            feats_ll = features["ll"].clone()
+            feats = self.ll_fusion(feats, feats_ll)
 
         uncertainty = (
             self.linear_pred_uncertainty(feats).squeeze(1) if self.predict_uncertainty else None
