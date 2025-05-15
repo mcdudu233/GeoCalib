@@ -183,13 +183,15 @@ class LightHamHead(BaseModel):
         self.predict_uncertainty = conf.predict_uncertainty
 
         # 使用 FreqFusion
+        self.feature_resample = True
+        self.feature_resample_group = 4
         self.freqfusions = nn.ModuleList()
         in_channels = self.in_channels[::-1]
         pre_c = in_channels[0]
         for c in in_channels[1:]:
             freqfusion = FreqFusion(
                 hr_channels=c, lr_channels=pre_c,
-                feature_resample=True, feature_resample_group=4,
+                feature_resample=self.feature_resample, feature_resample_group=self.feature_resample_group,
                 upsample_mode='bilinear',
                 hamming_window=False,
                 compressed_channels=(pre_c + c) // 4,
@@ -232,11 +234,13 @@ class LightHamHead(BaseModel):
         lowres_feat = inputs[0]
         for idx, (hires_feat, freqfusion) in enumerate(zip(inputs[1:], self.freqfusions)):
             _, hires_feat, lowres_feat = freqfusion(hr_feat=hires_feat, lr_feat=lowres_feat)
-            b, _, h, w = hires_feat.shape
-            lowres_feat = (torch.cat([hires_feat.reshape(b * 4, -1, h, w),
-                                     lowres_feat.reshape(b * 4, -1, h, w)],
-                                    dim=1)
-                           .reshape(b, -1, h, w))
+            if self.feature_resample:
+                b, _, h, w = hires_feat.shape
+                lowres_feat = torch.cat([hires_feat.reshape(b * self.feature_resample_group, -1, h, w),
+                                         lowres_feat.reshape(b * self.feature_resample_group, -1, h, w)],
+                                        dim=1).reshape(b, -1, h, w)
+            else:
+                lowres_feat = torch.cat([hires_feat, lowres_feat], dim=1)
 
         inputs = lowres_feat
         x = self.squeeze(inputs)

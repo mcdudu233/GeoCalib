@@ -2,6 +2,7 @@ import logging
 import math
 
 import numpy as np
+import torch
 
 from siclib.models import get_model
 from siclib.models.base_model import BaseModel
@@ -36,6 +37,7 @@ class GeoCalib(BaseModel):
         )
 
     def _forward(self, data):
+        torch.cuda.empty_cache()
         backbone_out = self.backbone(data)
         features = {"hl": backbone_out["features"], "padding": backbone_out.get("padding", None)}
 
