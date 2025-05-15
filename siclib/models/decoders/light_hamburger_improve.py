@@ -167,7 +167,7 @@ class LightHamHead(BaseModel):
 
     default_conf = {
         "predict_uncertainty": True,
-        "out_channels": 144,
+        "out_channels": 64,
         "in_channels": [64, 128, 320, 512],
         "in_index": [0, 1, 2, 3],
         "ham_channels": 512,
