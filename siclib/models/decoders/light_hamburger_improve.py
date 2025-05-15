@@ -230,8 +230,7 @@ class LightHamHead(BaseModel):
         inputs = inputs[::-1]
         lowres_feat = inputs[0]
         for idx, (hires_feat, freqfusion) in enumerate(zip(inputs[1:], self.freqfusions)):
-            _, hires_feat, lowres_feat = freqfusion(hr_feat=hires_feat, lr_feat=lowres_feat,
-                                                    use_checkpoint=self.use_checkpoint)
+            _, hires_feat, lowres_feat = freqfusion(hr_feat=hires_feat, lr_feat=lowres_feat)
             if self.feature_resample:
                 b, _, h, w = hires_feat.shape
                 lowres_feat = torch.cat([hires_feat.reshape(b * self.feature_resample_group, -1, h, w),
