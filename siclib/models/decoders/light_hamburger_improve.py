@@ -183,6 +183,7 @@ class LightHamHead(BaseModel):
         self.predict_uncertainty = conf.predict_uncertainty
 
         # 使用 FreqFusion
+        self.freqfusions = []
         in_channels = self.in_channels[::-1]
         pre_c = in_channels[0]
         for c in in_channels[1:]:
