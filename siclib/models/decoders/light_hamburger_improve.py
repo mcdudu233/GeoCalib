@@ -183,7 +183,7 @@ class LightHamHead(BaseModel):
         self.predict_uncertainty = conf.predict_uncertainty
 
         # 使用 FreqFusion
-        self.feature_resample = False
+        self.feature_resample = True
         self.feature_resample_group = 4
         self.freqfusions = nn.ModuleList()
         in_channels = self.in_channels[::-1]
