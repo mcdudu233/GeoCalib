@@ -37,13 +37,13 @@ class GeoCalib(BaseModel):
         )
 
     def _forward(self, data):
-        torch.cuda.empty_cache()
         backbone_out = self.backbone(data)
         features = {"hl": backbone_out["features"], "padding": backbone_out.get("padding", None)}
 
         if self.ll_enc is not None:
             features["ll"] = self.ll_enc(data)["features"]  # low level features
 
+        torch.cuda.empty_cache()
         out = self.perspective_decoder({"features": features})
 
         out |= {
