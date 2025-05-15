@@ -43,7 +43,6 @@ class GeoCalib(BaseModel):
         if self.ll_enc is not None:
             features["ll"] = self.ll_enc(data)["features"]  # low level features
 
-        torch.cuda.empty_cache()
         out = self.perspective_decoder({"features": features})
 
         out |= {
