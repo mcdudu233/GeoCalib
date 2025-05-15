@@ -166,7 +166,7 @@ class LightHamHead(BaseModel):
 
     default_conf = {
         "predict_uncertainty": True,
-        "out_channels": 64,
+        "out_channels": 144,
         "in_channels": [64, 128, 320, 512],
         "in_index": [0, 1, 2, 3],
         "ham_channels": 512,
@@ -204,7 +204,10 @@ class LightHamHead(BaseModel):
             self.out_conv = ConvModule(
                 self.out_channels, self.out_channels, 3, padding=1, bias=False
             )
-            self.ll_fusion = FeatureFusionBlock(self.out_channels, upsample=False)
+            self.out_conv1 = ConvModule(
+                self.out_channels, self.out_channels, 3, padding=1, bias=False
+            )
+            # self.ll_fusion = FeatureFusionBlock(self.out_channels, upsample=False)
 
     def _forward(self, features):
         """Forward function."""
@@ -230,8 +233,9 @@ class LightHamHead(BaseModel):
             feats = F.interpolate(feats, scale_factor=2, mode="bilinear", align_corners=False)
             feats = self.out_conv(feats)
             feats = F.interpolate(feats, scale_factor=2, mode="bilinear", align_corners=False)
-            feats_ll = features["ll"].clone()
-            feats = self.ll_fusion(feats, feats_ll)
+            feats = self.out_conv1(feats)
+            # feats_ll = features["ll"].clone()
+            # feats = self.ll_fusion(feats, feats_ll)
 
         uncertainty = (
             self.linear_pred_uncertainty(feats).squeeze(1) if self.predict_uncertainty else None

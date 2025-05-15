@@ -5,7 +5,7 @@ writer: null
 log_every_iter: 500
 eval_every_iter: 1000
 
-lr: 1e-4
+lr: 5e-5
 optimizer: adamw
 clip_grad: 1.0
 best_key: loss/param_total
@@ -23,7 +23,7 @@ lr_schedule:
       - type: MultiStepLR
         options:
           gamma: 0.1
-          milestones: [80_000, 130_000]
+          milestones: [50_000, 80_000, 110_000]
 
 submodules: []
 
