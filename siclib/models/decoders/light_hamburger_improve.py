@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from siclib.models import BaseModel
-from siclib.models.utils.modules import ConvModule, FeatureFusionBlock, FreqFusion
+from siclib.models.utils.modules import ConvModule, FeatureFusionBlock, FreqFusion, FeatureFusionUpsampleBlock
 
 
 # flake8: noqa
@@ -183,7 +183,7 @@ class LightHamHead(BaseModel):
         self.predict_uncertainty = conf.predict_uncertainty
 
         # 使用 FreqFusion
-        self.feature_resample = True
+        self.feature_resample = False
         self.feature_resample_group = 4
         self.freqfusions = nn.ModuleList()
         in_channels = self.in_channels[::-1]
@@ -222,7 +222,7 @@ class LightHamHead(BaseModel):
             self.out_conv = ConvModule(
                 self.out_channels, self.out_channels, 3, padding=1, bias=False
             )
-            self.ll_fusion = FeatureFusionBlock(self.out_channels, upsample=False)
+            self.ll_fusion = FeatureFusionUpsampleBlock(self.out_channels, upsample=False)
 
     def _forward(self, features):
         """Forward function."""
@@ -253,7 +253,6 @@ class LightHamHead(BaseModel):
             assert "ll" in features, "Low-level features are required for this model"
             feats = F.interpolate(feats, scale_factor=2, mode="bilinear", align_corners=False)
             feats = self.out_conv(feats)
-            feats = F.interpolate(feats, scale_factor=2, mode="bilinear", align_corners=False)
             feats_ll = features["ll"].clone()
             feats = self.ll_fusion(feats, feats_ll)
 
