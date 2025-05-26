@@ -203,7 +203,7 @@ class LightHamHead(BaseModel):
 
         self.hamburger = Hamburger(self.ham_channels)
 
-        self.align = ConvModule(self.ham_channels, self.out_channels, 1)
+        self.align = ConvModule(self.ham_channels, self.out_channels * 4, 1)
 
         if self.predict_uncertainty:
             self.linear_pred_uncertainty = nn.Sequential(
@@ -220,7 +220,7 @@ class LightHamHead(BaseModel):
         self.with_ll = conf.with_low_level
         if self.with_ll:
             self.out_conv = ConvModule(
-                self.out_channels, self.out_channels, 3, padding=1, bias=False
+                self.out_channels, self.out_channels, 5, padding=2, bias=False
             )
             self.ll_fusion = FeatureFusionUpsampleBlock(self.out_channels, upsample=False)
 
@@ -251,7 +251,9 @@ class LightHamHead(BaseModel):
 
         if self.with_ll:
             assert "ll" in features, "Low-level features are required for this model"
-            feats = F.interpolate(feats, scale_factor=2, mode="bilinear", align_corners=False)
+            # 利用pixelshuffle上采样
+            feats = F.pixel_shuffle(feats, 2)
+            # feats = F.interpolate(feats, scale_factor=2, mode="bilinear", align_corners=False)
             feats = self.out_conv(feats)
             feats_ll = features["ll"].clone()
             feats = self.ll_fusion(feats, feats_ll)
