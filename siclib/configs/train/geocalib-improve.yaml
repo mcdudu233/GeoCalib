@@ -1,5 +1,5 @@
 seed: 0
-num_steps: 150_000
+num_steps: 200_000
 
 writer: null
 log_every_iter: 500
