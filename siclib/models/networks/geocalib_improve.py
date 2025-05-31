@@ -47,7 +47,7 @@ class GeoCalib(BaseModel):
             features["ll"] = self.ll_enc(data)["features"]  # low level features
 
         if self.ll_enhance_enc is not None:
-            features["lle"] = self.ll_enc(data)["features"]  # low level features
+            features["lle"] = self.ll_enhance_enc(data)["features"]  # low level features
 
         out = self.perspective_decoder({"features": features})
 
