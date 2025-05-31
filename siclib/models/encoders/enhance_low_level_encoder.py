@@ -25,6 +25,7 @@ class EnhanceLowLevelEncoder(BaseModel):
 
         self.conv1 = ConvModule(conf.in_channel, conf.feat_dim, kernel_size=3, padding=1)
         self.conv2 = ConvModule(conf.feat_dim, conf.feat_dim, kernel_size=5, padding=2)
+        self.conv2 = ConvModule(conf.feat_dim, conf.feat_dim, kernel_size=7, padding=2)
 
     def _apply_laplacian(self, x):
         """实现拉普拉斯卷积"""
@@ -51,8 +52,9 @@ class EnhanceLowLevelEncoder(BaseModel):
 
         out = self._apply_laplacian(x)
         out = self.conv1(out)
-        out = self._apply_laplacian(out)
         out = self.conv2(out)
+        out = self._apply_laplacian(out)
+        out = self.conv3(out)
 
         return {"features": out}
 
