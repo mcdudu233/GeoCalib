@@ -17,6 +17,7 @@ class GeoCalib(BaseModel):
     default_conf = {
         "backbone": {"name": "encoders.mscan"},
         "ll_enc": {"name": "encoders.low_level_encoder"},
+        "ll_enhance_enc": {"name": "encoders.enhance_low_level_encoder"},
         "perspective_decoder": {"name": "decoders.perspective_decoder_improve"},
         "optimizer": {"name": "optimization.lm_optimizer"},
     }
@@ -27,6 +28,8 @@ class GeoCalib(BaseModel):
         logger.debug(f"Initializing GeoCalib with {conf}")
         self.backbone = get_model(conf.backbone["name"])(conf.backbone)
         self.ll_enc = get_model(conf.ll_enc["name"])(conf.ll_enc) if conf.ll_enc else None
+        self.ll_enhance_enc = get_model(conf.ll_enhance_enc["name"])(
+            conf.ll_enhance_enc) if conf.ll_enhance_enc else None
 
         self.perspective_decoder = get_model(conf.perspective_decoder["name"])(
             conf.perspective_decoder
@@ -42,6 +45,9 @@ class GeoCalib(BaseModel):
 
         if self.ll_enc is not None:
             features["ll"] = self.ll_enc(data)["features"]  # low level features
+
+        if self.ll_enhance_enc is not None:
+            features["lle"] = self.ll_enc(data)["features"]  # low level features
 
         out = self.perspective_decoder({"features": features})
 
