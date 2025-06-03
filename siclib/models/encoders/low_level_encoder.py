@@ -54,19 +54,8 @@ class LowLevelEncoder(BaseModel):
             fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
             axes_flat = axes.flatten()
             for i, ax in enumerate(axes_flat):
-                ax.imshow(c2[0][i].detach().cpu(), cmap="gray")
-                ax.axis('off')
-            plt.show()
-            fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
-            axes_flat = axes.flatten()
-            for i, ax in enumerate(axes_flat):
-                ax.imshow(c2[0][i+8].detach().cpu(), cmap="gray")
-                ax.axis('off')
-            plt.show()
-            fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
-            axes_flat = axes.flatten()
-            for i, ax in enumerate(axes_flat):
-                ax.imshow(c2[0][i+16].detach().cpu(), cmap="gray")
+                print(c2[0][i].detach().cpu())
+                ax.imshow(c2[0][i].detach().cpu()*10, cmap="gray")
                 ax.axis('off')
             plt.show()
         else:
