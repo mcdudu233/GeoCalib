@@ -27,9 +27,9 @@ class LowLevelEncoder(BaseModel):
 
         if self.conf.keep_resolution:
             self.conv1 = ConvModule(conf.in_channel, conf.feat_dim, kernel_size=3, padding=1)
-            self.relu1 = nn.ReLU(inplace=True)
+            self.relu1 = nn.ReLU()
             self.conv2 = ConvModule(conf.feat_dim, conf.feat_dim, kernel_size=5, padding=2)
-            self.relu2 = nn.ReLU(inplace=True)
+            self.relu2 = nn.ReLU()
             self.conv3 = ConvModule(conf.feat_dim, conf.feat_dim, kernel_size=7, padding=3)
         else:
             self.conv1 = nn.Conv2d(
