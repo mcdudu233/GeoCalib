@@ -56,7 +56,7 @@ class EnhanceLowLevelEncoder(BaseModel):
         out = self.conv1(out)
         out = self.conv2(out)
         for i in range(16):
-            plt.imshow(out[0][i].detach().copy(),cmap="gray")
+            plt.imshow(out[0][i].detach().cpu(),cmap="gray")
             plt.show()
         out = self._apply_laplacian(out)
         out = self.conv3(out)
