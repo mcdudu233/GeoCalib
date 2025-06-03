@@ -53,37 +53,10 @@ class EnhanceLowLevelEncoder(BaseModel):
         ), "Image size must be multiple of 32 if not using single image input."
 
         out = self._apply_laplacian(x)
-        for i in range(3):
-            plt.imshow(out[0][i].detach().cpu(),cmap="gray")
-            plt.show()
         out = self.conv1(out)
-        fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
-        axes_flat = axes.flatten()
-        for i, ax in enumerate(axes_flat):
-            ax.imshow(out[0][i].detach().cpu(),cmap="gray")
-            ax.axis('off')
-        plt.show()
         out = self.conv2(out)
-        fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
-        axes_flat = axes.flatten()
-        for i, ax in enumerate(axes_flat):
-            ax.imshow(out[0][i].detach().cpu(), cmap="gray")
-            ax.axis('off')
-        plt.show()
         out = self._apply_laplacian(out)
-        fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
-        axes_flat = axes.flatten()
-        for i, ax in enumerate(axes_flat):
-            ax.imshow(out[0][i].detach().cpu(), cmap="gray")
-            ax.axis('off')
-        plt.show()
         out = self.conv3(out)
-        fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
-        axes_flat = axes.flatten()
-        for i, ax in enumerate(axes_flat):
-            ax.imshow(out[0][i].detach().cpu(), cmap="gray")
-            ax.axis('off')
-        plt.show()
 
         return {"features": out}
 

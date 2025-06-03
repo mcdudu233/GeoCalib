@@ -1,6 +1,7 @@
 import logging
 
 import torch.nn as nn
+from matplotlib import pyplot as plt
 
 from siclib.models.base_model import BaseModel
 from siclib.models.utils.modules import ConvModule
@@ -42,7 +43,19 @@ class LowLevelEncoder(BaseModel):
 
         if self.conf.keep_resolution:
             c1 = self.conv1(x)
+            fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
+            axes_flat = axes.flatten()
+            for i, ax in enumerate(axes_flat):
+                plt.imshow(c1[0][i].detach().cpu(), cmap="gray")
+                ax.axis('off')
+            plt.show()
             c2 = self.conv2(c1)
+            fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
+            axes_flat = axes.flatten()
+            for i, ax in enumerate(axes_flat):
+                plt.imshow(c2[0][i].detach().cpu(), cmap="gray")
+                ax.axis('off')
+            plt.show()
         else:
             x = self.conv1(x)
             x = self.bn1(x)
