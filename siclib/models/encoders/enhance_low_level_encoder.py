@@ -1,5 +1,6 @@
 import logging
 
+import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -53,6 +54,9 @@ class EnhanceLowLevelEncoder(BaseModel):
         out = self._apply_laplacian(x)
         out = self.conv1(out)
         out = self.conv2(out)
+        for i in range(16):
+            plt.imshow(out[0][i],cmap="gray")
+            plt.show()
         out = self._apply_laplacian(out)
         out = self.conv3(out)
 
