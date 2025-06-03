@@ -60,22 +60,28 @@ class EnhanceLowLevelEncoder(BaseModel):
         fig, axes = plt.subplots(nrows=8, ncols=4, figsize=(12, 24))
         axes_flat = axes.flatten()
         for i, ax in enumerate(axes_flat):
-            plt.imshow(out[0][i].detach().cpu(),cmap="gray")
+            ax.imshow(out[0][i].detach().cpu(),cmap="gray")
             ax.axis('off')
         plt.show()
         out = self.conv2(out)
+        fig, axes = plt.subplots(nrows=8, ncols=4, figsize=(12, 24))
+        axes_flat = axes.flatten()
         for i, ax in enumerate(axes_flat):
-            plt.imshow(out[0][i].detach().cpu(), cmap="gray")
+            ax.imshow(out[0][i].detach().cpu(), cmap="gray")
             ax.axis('off')
         plt.show()
         out = self._apply_laplacian(out)
+        fig, axes = plt.subplots(nrows=8, ncols=4, figsize=(12, 24))
+        axes_flat = axes.flatten()
         for i, ax in enumerate(axes_flat):
-            plt.imshow(out[0][i].detach().cpu(), cmap="gray")
+            ax.imshow(out[0][i].detach().cpu(), cmap="gray")
             ax.axis('off')
         plt.show()
         out = self.conv3(out)
+        fig, axes = plt.subplots(nrows=8, ncols=4, figsize=(12, 24))
+        axes_flat = axes.flatten()
         for i, ax in enumerate(axes_flat):
-            plt.imshow(out[0][i].detach().cpu(), cmap="gray")
+            ax.imshow(out[0][i].detach().cpu(), cmap="gray")
             ax.axis('off')
         plt.show()
 
