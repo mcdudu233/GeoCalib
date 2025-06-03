@@ -27,7 +27,10 @@ class LowLevelEncoder(BaseModel):
 
         if self.conf.keep_resolution:
             self.conv1 = ConvModule(conf.in_channel, conf.feat_dim, kernel_size=3, padding=1)
-            self.conv2 = ConvModule(conf.feat_dim, conf.feat_dim, kernel_size=3, padding=1)
+            self.relu1 = nn.ReLU(inplace=True)
+            self.conv2 = ConvModule(conf.feat_dim, conf.feat_dim, kernel_size=5, padding=2)
+            self.relu2 = nn.ReLU(inplace=True)
+            self.conv3 = ConvModule(conf.feat_dim, conf.feat_dim, kernel_size=7, padding=3)
         else:
             self.conv1 = nn.Conv2d(
                 conf.in_channel, conf.feat_dim, kernel_size=7, stride=2, padding=3, bias=False
@@ -43,14 +46,17 @@ class LowLevelEncoder(BaseModel):
         ), "Image size must be multiple of 32 if not using single image input."
 
         if self.conf.keep_resolution:
-            c1 = self.conv1(x)
-            c2 = self.conv2(c1)
+            x = self.conv1(x)
+            x = self.relu1(x)
+            x = self.conv2(x)
+            x = self.relu2(x)
+            out = self.conv3(x)
         else:
             x = self.conv1(x)
             x = self.bn1(x)
-            c2 = self.relu(x)
+            out = self.relu(x)
 
-        return {"features": c2}
+        return {"features": out}
 
     def loss(self, pred, data):
         raise NotImplementedError
