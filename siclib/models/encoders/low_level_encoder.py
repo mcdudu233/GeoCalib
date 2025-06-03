@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class LowLevelEncoder(BaseModel):
     default_conf = {
-        "feat_dim": 64,
+        "feat_dim": 144,
         "in_channel": 3,
         "keep_resolution": True,
     }
