@@ -10,7 +10,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from matplotlib import pyplot as plt
 from torch.utils.checkpoint import checkpoint
 from torch import Tensor
 
@@ -164,7 +163,7 @@ class FeatureFusionBlock(nn.Module):
             # for i, ax in enumerate(axes_flat):
             #     ax.imshow(tmp[0][i].detach().cpu() * 10, cmap="gray")
             #     ax.axis('off')
-            plt.show()
+            # plt.show()
             output = output + self.resConfUnit1(xs[1])
 
         output = self.resConfUnit2(output)
