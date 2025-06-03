@@ -53,7 +53,7 @@ class EnhanceLowLevelEncoder(BaseModel):
         ), "Image size must be multiple of 32 if not using single image input."
 
         out = self._apply_laplacian(x)
-        for i in range(32):
+        for i in range(3):
             plt.imshow(out[0][i].detach().cpu(),cmap="gray")
             plt.show()
         out = self.conv1(out)
