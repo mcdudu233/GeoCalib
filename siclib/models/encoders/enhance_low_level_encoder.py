@@ -55,6 +55,7 @@ class EnhanceLowLevelEncoder(BaseModel):
         out = self._apply_laplacian(x)
         out = self.conv1(out)
         out = self.conv2(out)
+        out = self._apply_laplacian(out)
         out = self.conv3(out)
 
         return {"features": out}
