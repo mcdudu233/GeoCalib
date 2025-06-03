@@ -46,14 +46,14 @@ class LowLevelEncoder(BaseModel):
             fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
             axes_flat = axes.flatten()
             for i, ax in enumerate(axes_flat):
-                plt.imshow(c1[0][i].detach().cpu(), cmap="gray")
+                im.imshow(c1[0][i].detach().cpu(), cmap="gray")
                 ax.axis('off')
             plt.show()
             c2 = self.conv2(c1)
             fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
             axes_flat = axes.flatten()
             for i, ax in enumerate(axes_flat):
-                plt.imshow(c2[0][i].detach().cpu(), cmap="gray")
+                im.imshow(c2[0][i].detach().cpu(), cmap="gray")
                 ax.axis('off')
             plt.show()
         else:
