@@ -3,6 +3,7 @@ import logging
 import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.nn.functional as F
+from numpy.f2py.auxfuncs import throw_error
 
 from siclib.models.base_model import BaseModel
 from siclib.models.utils.modules import ConvModule
@@ -55,8 +56,9 @@ class EnhanceLowLevelEncoder(BaseModel):
         out = self.conv1(out)
         out = self.conv2(out)
         for i in range(16):
-            plt.imshow(out[0][i],cmap="gray")
+            plt.imshow(out[0][i].detach(),cmap="gray")
             plt.show()
+        raise Exception
         out = self._apply_laplacian(out)
         out = self.conv3(out)
 
