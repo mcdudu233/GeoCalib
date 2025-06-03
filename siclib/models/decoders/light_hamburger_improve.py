@@ -7,6 +7,7 @@ https://github.com/Visual-Attention-Network/SegNeXt/blob/main/mmseg/models/decod
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from matplotlib import pyplot as plt
 
 from siclib.models import BaseModel
 from siclib.models.utils.modules import ConvModule, FeatureFusionBlock, FreqFusion, FeatureFusionUpsampleBlock
@@ -257,7 +258,21 @@ class LightHamHead(BaseModel):
             feats = F.interpolate(feats, scale_factor=2, mode="bilinear", align_corners=False)
             feats_ll = features["ll"].clone()
             feats = self.ll_fusion1(feats, feats_ll)
+            fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
+            axes_flat = axes.flatten()
+            for i, ax in enumerate(axes_flat):
+                print(feats[0][i])
+                ax.imshow(feats[0][i].detach().cpu() * 10, cmap="gray")
+                ax.axis('off')
+            plt.show()
             feats_lle = features["lle"].clone()
+            fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
+            axes_flat = axes.flatten()
+            for i, ax in enumerate(axes_flat):
+                print(feats[0][i])
+                ax.imshow(feats_lle[0][i].detach().cpu() * 10, cmap="gray")
+                ax.axis('off')
+            plt.show()
             feats = self.ll_fusion2(feats, feats_lle)
 
         uncertainty = (
