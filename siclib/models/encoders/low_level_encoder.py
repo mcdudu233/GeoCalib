@@ -2,6 +2,7 @@ import logging
 
 import torch.nn as nn
 from matplotlib import pyplot as plt
+from matplotlib.pyplot import axhspan
 
 from siclib.models.base_model import BaseModel
 from siclib.models.utils.modules import ConvModule
@@ -46,14 +47,14 @@ class LowLevelEncoder(BaseModel):
             fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
             axes_flat = axes.flatten()
             for i, ax in enumerate(axes_flat):
-                im.imshow(c1[0][i].detach().cpu(), cmap="gray")
+                ax.imshow(c1[0][i].detach().cpu(), cmap="gray")
                 ax.axis('off')
             plt.show()
             c2 = self.conv2(c1)
             fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
             axes_flat = axes.flatten()
             for i, ax in enumerate(axes_flat):
-                im.imshow(c2[0][i].detach().cpu(), cmap="gray")
+                ax.imshow(c2[0][i].detach().cpu(), cmap="gray")
                 ax.axis('off')
             plt.show()
         else:
