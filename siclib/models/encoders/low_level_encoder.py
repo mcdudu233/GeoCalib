@@ -47,8 +47,26 @@ class LowLevelEncoder(BaseModel):
 
         if self.conf.keep_resolution:
             x = self.conv1(x)
+            fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
+            axes_flat = axes.flatten()
+            for i, ax in enumerate(axes_flat):
+                ax.imshow(x[0][i].detach().cpu(), cmap="gray")
+                ax.axis('off')
+            plt.show()
             x = self.relu1(x)
+            fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
+            axes_flat = axes.flatten()
+            for i, ax in enumerate(axes_flat):
+                ax.imshow(x[0][i].detach().cpu(), cmap="gray")
+                ax.axis('off')
+            plt.show()
             x = self.conv2(x)
+            fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
+            axes_flat = axes.flatten()
+            for i, ax in enumerate(axes_flat):
+                ax.imshow(x[0][i].detach().cpu(), cmap="gray")
+                ax.axis('off')
+            plt.show()
             x = self.relu2(x)
             fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
             axes_flat = axes.flatten()
