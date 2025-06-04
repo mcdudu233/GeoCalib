@@ -27,10 +27,7 @@ class LowLevelEncoder(BaseModel):
 
         if self.conf.keep_resolution:
             self.conv1 = ConvModule(conf.in_channel, conf.feat_dim, kernel_size=3, padding=1)
-            self.relu1 = nn.ReLU()
-            self.conv2 = ConvModule(conf.feat_dim, conf.feat_dim, kernel_size=5, padding=2)
-            self.relu2 = nn.ReLU()
-            self.conv3 = ConvModule(conf.feat_dim, conf.feat_dim, kernel_size=7, padding=3)
+            self.conv2 = ConvModule(conf.feat_dim, conf.feat_dim, kernel_size=3, padding=1)
         else:
             self.conv1 = nn.Conv2d(
                 conf.in_channel, conf.feat_dim, kernel_size=7, stride=2, padding=3, bias=False
@@ -47,34 +44,7 @@ class LowLevelEncoder(BaseModel):
 
         if self.conf.keep_resolution:
             x = self.conv1(x)
-            fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
-            axes_flat = axes.flatten()
-            for i, ax in enumerate(axes_flat):
-                ax.imshow(x[0][i].detach().cpu(), cmap="gray")
-                ax.axis('off')
-            plt.show()
-            x = self.relu1(x)
-            fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
-            axes_flat = axes.flatten()
-            for i, ax in enumerate(axes_flat):
-                ax.imshow(x[0][i].detach().cpu(), cmap="gray")
-                ax.axis('off')
-            plt.show()
-            x = self.conv2(x)
-            fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
-            axes_flat = axes.flatten()
-            for i, ax in enumerate(axes_flat):
-                ax.imshow(x[0][i].detach().cpu(), cmap="gray")
-                ax.axis('off')
-            plt.show()
-            x = self.relu2(x)
-            fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
-            axes_flat = axes.flatten()
-            for i, ax in enumerate(axes_flat):
-                ax.imshow(x[0][i].detach().cpu(), cmap="gray")
-                ax.axis('off')
-            plt.show()
-            out = self.conv3(x)
+            out = self.conv2(x)
         else:
             x = self.conv1(x)
             x = self.bn1(x)
