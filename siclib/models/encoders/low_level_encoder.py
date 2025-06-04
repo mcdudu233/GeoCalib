@@ -50,6 +50,12 @@ class LowLevelEncoder(BaseModel):
             x = self.relu1(x)
             x = self.conv2(x)
             x = self.relu2(x)
+            fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
+            axes_flat = axes.flatten()
+            for i, ax in enumerate(axes_flat):
+                ax.imshow(x[0][i].detach().cpu(), cmap="gray")
+                ax.axis('off')
+            plt.show()
             out = self.conv3(x)
         else:
             x = self.conv1(x)
