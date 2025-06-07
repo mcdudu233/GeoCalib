@@ -158,13 +158,13 @@ class FeatureFusionBlock(nn.Module):
         output = xs[0]
 
         if len(xs) == 2:
-            # tmp = self.resConfUnit1(xs[1])
-            # fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
-            # axes_flat = axes.flatten()
-            # for i, ax in enumerate(axes_flat):
-            #     ax.imshow(tmp[0][i].detach().cpu(), cmap="gray")
-            #     ax.axis('off')
-            # plt.show()
+            tmp = self.resConfUnit1(xs[1])
+            fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
+            axes_flat = axes.flatten()
+            for i, ax in enumerate(axes_flat):
+                ax.imshow(tmp[0][i].detach().cpu(), cmap="gray")
+                ax.axis('off')
+            plt.show()
             output = output + self.resConfUnit1(xs[1])
 
         output = self.resConfUnit2(output)
