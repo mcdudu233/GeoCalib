@@ -193,7 +193,7 @@ class LightHamHead(BaseModel):
             freqfusion = FreqFusion(
                 hr_channels=c, lr_channels=pre_c,
                 feature_resample=self.feature_resample, feature_resample_group=self.feature_resample_group,
-                upsample_mode='bilinear',
+                upsample_mode='bicubic',
                 hamming_window=False,
                 compressed_channels=(pre_c + c) // 4,
             )
@@ -253,13 +253,13 @@ class LightHamHead(BaseModel):
 
         if self.with_ll:
             assert "ll" in features, "Low-level features are required for this model"
-            feats = F.interpolate(feats, scale_factor=2, mode="bilinear", align_corners=False)
+            feats = F.interpolate(feats, scale_factor=2, mode="bicubic", align_corners=False)
             feats = self.out_conv(feats)
-            feats = F.interpolate(feats, scale_factor=2, mode="bilinear", align_corners=False)
-            feats_ll = features["ll"].clone()
-            feats = self.ll_fusion1(feats, feats_ll)
+            feats = F.interpolate(feats, scale_factor=2, mode="bicubic", align_corners=False)
             feats_lle = features["lle"].clone()
             feats = self.ll_fusion2(feats, feats_lle)
+            feats_ll = features["ll"].clone()
+            feats = self.ll_fusion1(feats, feats_ll)
 
         uncertainty = (
             self.linear_pred_uncertainty(feats).squeeze(1) if self.predict_uncertainty else None

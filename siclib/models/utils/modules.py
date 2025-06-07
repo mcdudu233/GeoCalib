@@ -169,12 +169,12 @@ class FeatureFusionBlock(nn.Module):
 
         output = self.resConfUnit2(output)
 
-        # fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
-        # axes_flat = axes.flatten()
-        # for i, ax in enumerate(axes_flat):
-        #     ax.imshow(output[0][i].detach().cpu(), cmap="gray")
-        #     ax.axis('off')
-        # plt.show()
+        fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
+        axes_flat = axes.flatten()
+        for i, ax in enumerate(axes_flat):
+            ax.imshow(output[0][i].detach().cpu(), cmap="gray")
+            ax.axis('off')
+        plt.show()
 
         if self.upsample:
             output = F.interpolate(output, scale_factor=2, mode="bilinear", align_corners=False)
