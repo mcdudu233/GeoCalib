@@ -184,21 +184,21 @@ class LightHamHead(BaseModel):
         self.predict_uncertainty = conf.predict_uncertainty
 
         # 使用 FreqFusion
-        self.feature_resample = False
-        self.feature_resample_group = 4
-        self.freqfusions = nn.ModuleList()
-        in_channels = self.in_channels[::-1]
-        pre_c = in_channels[0]
-        for c in in_channels[1:]:
-            freqfusion = FreqFusion(
-                hr_channels=c, lr_channels=pre_c,
-                feature_resample=self.feature_resample, feature_resample_group=self.feature_resample_group,
-                upsample_mode='bicubic',
-                hamming_window=False,
-                compressed_channels=(pre_c + c) // 4,
-            )
-            self.freqfusions.append(freqfusion)
-            pre_c += c
+        # self.feature_resample = False
+        # self.feature_resample_group = 4
+        # self.freqfusions = nn.ModuleList()
+        # in_channels = self.in_channels[::-1]
+        # pre_c = in_channels[0]
+        # for c in in_channels[1:]:
+        #     freqfusion = FreqFusion(
+        #         hr_channels=c, lr_channels=pre_c,
+        #         feature_resample=self.feature_resample, feature_resample_group=self.feature_resample_group,
+        #         upsample_mode='bicubic',
+        #         hamming_window=False,
+        #         compressed_channels=(pre_c + c) // 4,
+        #     )
+        #     self.freqfusions.append(freqfusion)
+        #     pre_c += c
 
         self.squeeze = ConvModule(sum(self.in_channels), self.ham_channels, 1)
 
@@ -232,19 +232,28 @@ class LightHamHead(BaseModel):
         inputs = [features["hl"][i] for i in self.in_index]
 
         # 使用 FreqFusion
-        inputs = inputs[::-1]
-        lowres_feat = inputs[0]
-        for idx, (hires_feat, freqfusion) in enumerate(zip(inputs[1:], self.freqfusions)):
-            _, hires_feat, lowres_feat = freqfusion(hr_feat=hires_feat, lr_feat=lowres_feat)
-            if self.feature_resample:
-                b, _, h, w = hires_feat.shape
-                lowres_feat = torch.cat([hires_feat.reshape(b * self.feature_resample_group, -1, h, w),
-                                         lowres_feat.reshape(b * self.feature_resample_group, -1, h, w)],
-                                        dim=1).reshape(b, -1, h, w)
-            else:
-                lowres_feat = torch.cat([hires_feat, lowres_feat], dim=1)
+        # inputs = inputs[::-1]
+        # lowres_feat = inputs[0]
+        # for idx, (hires_feat, freqfusion) in enumerate(zip(inputs[1:], self.freqfusions)):
+        #     _, hires_feat, lowres_feat = freqfusion(hr_feat=hires_feat, lr_feat=lowres_feat)
+        #     if self.feature_resample:
+        #         b, _, h, w = hires_feat.shape
+        #         lowres_feat = torch.cat([hires_feat.reshape(b * self.feature_resample_group, -1, h, w),
+        #                                  lowres_feat.reshape(b * self.feature_resample_group, -1, h, w)],
+        #                                 dim=1).reshape(b, -1, h, w)
+        #     else:
+        #         lowres_feat = torch.cat([hires_feat, lowres_feat], dim=1)
+        #
+        # inputs = lowres_feat
 
-        inputs = lowres_feat
+        inputs = [
+            F.interpolate(
+                level, size=inputs[0].shape[2:], mode="bicubic", align_corners=self.align_corners
+            )
+            for level in inputs
+        ]
+
+        inputs = torch.cat(inputs, dim=1)
         x = self.squeeze(inputs)
 
         x = self.hamburger(x)
@@ -256,12 +265,10 @@ class LightHamHead(BaseModel):
             feats = F.interpolate(feats, scale_factor=2, mode="bicubic", align_corners=False)
             feats = self.out_conv(feats)
             feats = F.interpolate(feats, scale_factor=2, mode="bicubic", align_corners=False)
-            print(1)
-            feats_ll = features["ll"].clone()
-            feats = self.ll_fusion1(feats, feats_ll)
-            print(2)
             feats_lle = features["lle"].clone()
-            feats = self.ll_fusion2(feats, feats_lle)
+            feats = self.ll_fusion1(feats, feats_lle)
+            feats_ll = features["ll"].clone()
+            feats = self.ll_fusion2(feats, feats_ll)
 
         uncertainty = (
             self.linear_pred_uncertainty(feats).squeeze(1) if self.predict_uncertainty else None
