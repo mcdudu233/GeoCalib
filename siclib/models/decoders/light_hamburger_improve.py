@@ -256,8 +256,10 @@ class LightHamHead(BaseModel):
             feats = F.interpolate(feats, scale_factor=2, mode="bicubic", align_corners=False)
             feats = self.out_conv(feats)
             feats = F.interpolate(feats, scale_factor=2, mode="bicubic", align_corners=False)
+            print(1)
             feats_ll = features["ll"].clone()
             feats = self.ll_fusion1(feats, feats_ll)
+            print(2)
             feats_lle = features["lle"].clone()
             feats = self.ll_fusion2(feats, feats_lle)
 
