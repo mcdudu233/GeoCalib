@@ -257,9 +257,9 @@ class LightHamHead(BaseModel):
             feats = self.out_conv(feats)
             feats = F.interpolate(feats, scale_factor=2, mode="bicubic", align_corners=False)
             feats_lle = features["lle"].clone()
-            feats = self.ll_fusion2(feats, feats_lle)
+            feats = self.ll_fusion1(feats, feats_lle)
             feats_ll = features["ll"].clone()
-            feats = self.ll_fusion1(feats, feats_ll)
+            feats = self.ll_fusion2(feats, feats_ll)
 
         uncertainty = (
             self.linear_pred_uncertainty(feats).squeeze(1) if self.predict_uncertainty else None
