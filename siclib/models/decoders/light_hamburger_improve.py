@@ -258,20 +258,8 @@ class LightHamHead(BaseModel):
             feats = F.interpolate(feats, scale_factor=2, mode="bicubic", align_corners=False)
             feats_ll = features["ll"].clone()
             feats = self.ll_fusion1(feats, feats_ll)
-            fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
-            axes_flat = axes.flatten()
-            for i, ax in enumerate(axes_flat):
-                ax.imshow(feats[0][i].detach().cpu(), cmap="gray")
-                ax.axis('off')
-            plt.show()
             feats_lle = features["lle"].clone()
             feats = self.ll_fusion2(feats, feats_lle)
-            fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(12, 24))
-            axes_flat = axes.flatten()
-            for i, ax in enumerate(axes_flat):
-                ax.imshow(feats[0][i].detach().cpu(), cmap="gray")
-                ax.axis('off')
-            plt.show()
 
         uncertainty = (
             self.linear_pred_uncertainty(feats).squeeze(1) if self.predict_uncertainty else None
